@@ -1,0 +1,11 @@
+# Render Blueprint：推到 GitHub 后，打开
+# https://render.com/deploy?repo=<你的仓库地址>
+# 点一次就能部署，本地不需要安装任何东西。
+services:
+  - type: web
+    name: deepseek-to-doc
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health

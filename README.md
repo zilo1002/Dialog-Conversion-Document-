@@ -1,6 +1,10 @@
-# DeepSeek 对话 → 按日期排版的文档
+# AI 对话识别存档（DeepSeek / ChatGPT / Claude）
 
-把 DeepSeek / ChatGPT / Claude 的分享链接变成排好版的 HTML 和 Markdown 文档：按日期分节、区分双方角色、保留代码块与思考过程。
+[![Deploy to Render](https://render.com/images/deploy.svg)](https://render.com/deploy?repo=https://github.com/<你的用户名>/deepseek-to-doc)
+
+打开网页就是完整界面：中间一个输入框，粘贴分享链接点「识别存档」，直接生成按日期排版的 HTML 与 Markdown 文档并自动存档，历史文档可反复下载、可删除。
+
+部署一次就好：把仓库推到 GitHub，点上面的按钮在 Render 部署，拿到固定网址就能一直用，本地不需要装任何东西（详见「部署」一节）。想在本地跑，按下面的「快速开始」。
 
 ## 快速开始
 
@@ -14,7 +18,8 @@ npm start
 - Node 版本：18.17 以上（用到内置 `fetch`；开发验证用的是 Node 24）
 - 端口：默认 5178，可用 `PORT=8080 npm start` 改
 - 依赖：`express`（本地服务）、`cheerio`（HTML 兜底解析）、`marked`（Markdown 渲染）
-- 测试：`npm test`
+- 测试：`npm test`（23 个用例）
+- 存档目录：默认项目下的 `data/`（每个文档一个 JSON，含元信息和两种文档内容），可用环境变量 `DATA_DIR` 改；`data/` 不进 git
 
 ## 支持的平台（实测结论 2026-11）
 
@@ -28,12 +33,12 @@ npm start
 
 三个平台的解析都不绕过登录墙、验证码或地区限制：抓不到时返回明确原因并引导「粘贴全文」。测试里的 ChatGPT/Claude 样本是按上述结构构造的合成样本（`samples/sample-chatgpt-share.html`、`samples/sample-claude-share.html`），DeepSeek 样本是真实抓取的返回。
 
-## 用户流程
+## 界面
 
-1. 在对话页点「分享」，复制生成的公开链接（DeepSeek / ChatGPT / Claude 都行，链接粘进来会自动识别来源）。
-2. 打开本项目页面，粘贴链接，选时区（默认 Asia/Shanghai），点「生成文档」。
-3. 页面给出：标题、消息条数、日期分布、提示信息；左边 iframe 预览排版效果，右边 Markdown 预览。
-4. 点「下载 HTML」/「下载 Markdown」，文件名形如 `标题_2026-04-26.html`。
+- 首屏：一个完整窗口，中间是链接输入框和「识别存档」按钮；没有链接时展开「粘贴全文」也能成文。
+- 识别后进入结果页：排版预览（文档本身按日期分节、逐条带时间）、元信息（来源、日期、消息数、时间说明）、下载 HTML / 下载 Markdown，可切换看 Markdown 原文。
+- 存档页：识别过的文档都在，卡片列出标题、来源、日期、条数，每张卡可查看、重新下载（HTML 和 Markdown 各一个按钮，可下多次）、删除（点两次确认）。首屏下方同时显示最近 3 条。
+- 移动端可用：窄屏下输入框和按钮自动竖排，卡片单列。
 
 ## 抓取原理（实测结论，2026-11）
 
@@ -102,6 +107,7 @@ GET https://chat.deepseek.com/api/v0/share/content?share_id=<id>
 - 分享接口返回的标题常常只是通用占位（实测 DeepSeek 就是 `Shared Conversation`），这时文档标题取首条提问前 28 个字，并在文档里标注。
 - ChatGPT / Claude 的解析基于其分享页内嵌的 `__NEXT_DATA__` 结构；这两个站点对无浏览器特征的请求可能弹 Cloudflare 验证或要求登录，遇到就换「粘贴全文」。Claude 对部分地区直接返回 region_unavailable，这是它的访问限制，本项目不绕过。
 - 三个平台里拿不到逐条时间戳时，文档会明确写「对话日期未知（导入日期 今天）」，不编造时间。
+- 存档是写在本机/实例的 `data/` 目录里的。Render、Railway 免费实例的磁盘会随重启或重新部署重置，存档会丢；要长期保留，要么挂平台的持久磁盘，要么用自有服务器部署并把 `data/` 备份下来。
 - 只解析单条分享链接里的对话；需要登录才能看的对话抓不到。
 - 分享页里的「下载 / 复制」按钮文字属于页面装饰，复制全文时已自动去掉；但页面结构变了可能残留个别行，可在粘贴框里手动删。
 - 时区换算依赖 Node 的 `Intl` 时区数据，需带完整 ICU（官方发行版默认带）。
@@ -126,44 +132,38 @@ git push -u origin main
 
 ## 部署
 
-先说清楚一件和网络有关的事：Render、Railway 这类海外平台的域名在国内直连基本不可用。按你的访问场景选路线即可。两种方式构建命令都是 `npm install`、启动命令都是 `npm start`，端口代码里读 `process.env.PORT`（本地没设时默认 5178），平台注入的 PORT 会自动生效，不需要改代码。
+推荐路径不需要本地装任何东西：GitHub 推送 → Render 页面点一次 → 拿到固定网址。构建命令 `npm install`、启动命令 `npm start`、健康检查 `/api/health`（render.yaml 已配好）；端口代码里读 `process.env.PORT`（本地没设时默认 5178），平台注入的 PORT 自动生效。
 
-### 路线一（海外访问）：Render / Railway
+1. 把仓库推到 GitHub（见上一节的命令）。
+2. 打开 `https://render.com/deploy?repo=<你的仓库地址>`（README 顶部有同一个按钮），登录后点 Apply / Create Web Service，等一两分钟。
+3. 拿到固定网址（形如 `https://deepseek-to-doc.onrender.com`），打开就是完整界面，手机浏览器也能用。
 
-Render：New → Web Service → 连接 GitHub 仓库 → Build Command 填 `npm install`，Start Command 填 `npm start`，Health Check Path 填 `/api/health`；免费档长时间没人访问会休眠，首次冷启动要等几秒。
+免费实例限制：15 分钟无人访问会休眠，首次访问要等几秒；实例磁盘随重启/重新部署重置，`data/` 里的存档会丢（见「已知限制」）。
+
+### 备选
 
 Railway：New Project → Deploy from GitHub repo 选这个仓库，自动识别 Node 服务，Start Command 用 `npm start`；PORT 由平台注入。
 
-### 路线二（国内外都能访问，推荐）：Zeabur / 自有服务器 Docker
-
-国内直连，推荐走能直连的平台或自己的 VPS，仓库里已带 Dockerfile（node:20-alpine，`npm install --omit=dev && npm start`，端口读 PORT）。
-
-Zeabur：控制台直接选「Deploy from GitHub」连这个仓库，或用 Docker 部署方式选这个 Dockerfile；绑定域名后国内一般可直连，免费额度够个人用。
-
-自有服务器（国内 VPS 或有公网 IP 的机器）：
+Docker 自建：仓库带 Dockerfile（node:20-alpine，`npm install --omit=dev && npm start`，端口读 PORT）。
 
 ```bash
-# 构建并后台跑，PORT 想用 8080 就这样映射
 docker build -t deepseek-to-doc .
 docker run -d --name deepseek-to-doc -e PORT=8080 -p 8080:8080 --restart unless-stopped deepseek-to-doc
 # 浏览器打开 http://<服务器IP>:8080
 ```
 
-不想用 Docker，装好 Node 20+ 后 `npm install && npm start` 也一样能跑，再配个 systemd 或 nginx 反代即可。
-
-### 备选思路（免费，国内通常可直连）：Cloudflare Workers + Pages
-
-如果不想维护任何服务器，可以往 Cloudflare 上改，思路如下，本项目没有实现：
-
-- 服务端逻辑不多（抓分享接口 + 解析 + 渲染），把 Express 的几个路由改写成 Workers 的 fetch handler 不难；`fetchShare.js` 里用的是标准 `fetch`，Workers 原生支持，几乎不用动。
-- `public/` 静态页面放 Pages，Worker 只保留 `/api/*` 路由，Pages 的 Functions 或 Worker Routes 把 `/api/*` 指过去。
-- 需要注意两点：一是 Workers 免费档有每天 10 万次请求和 CPU 时间限制，个人用足够；二是生成结果目前放进程内存，Workers 无常驻内存，需要把「预览/下载」改成同一次请求里返回，或塞进 Cache/KV。
+不想用 Docker，装好 Node 20+ 后 `npm install && npm start` 也一样能跑；要存档不丢就把 `data/` 挂到持久盘或备份。
 
 ## 目录结构
 
 ```
 deepseek-to-doc/
-├── .gitignore            # 忽略 node_modules / 日志 / .env
+├── .gitignore            # 忽略 node_modules / 日志 / .env / data
+├── render.yaml           # Render Blueprint（一键部署）
+├── data/                 # 运行时生成的存档（不进 git）
+├── src/
+│   ├── convert.js        # 识别转换入口（三平台分发 + 粘贴）
+│   ├── archive.js        # data/ 目录持久化存档
 ├── .dockerignore           # Docker 构建时排除的内容
 ├── Dockerfile              # node:20-alpine，VPS / Zeabur 用
 ├── LICENSE                # MIT

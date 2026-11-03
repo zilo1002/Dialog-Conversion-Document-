@@ -3,106 +3,85 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DeepSeek 分享链接 → 按日期排版的文档</title>
+<title>AI 对话识别存档 · DeepSeek / ChatGPT / Claude</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<main class="app">
-  <header class="head">
-    <h1>AI 对话 → 文档</h1>
-    <p class="sub">粘贴 DeepSeek / ChatGPT / Claude 的分享链接，抓取完整对话，按日期排版成 HTML 与 Markdown。</p>
-  </header>
-
-  <div class="tabs" role="tablist">
-    <button class="tab active" data-mode="url" role="tab">分享链接</button>
-    <button class="tab" data-mode="paste" role="tab">粘贴全文</button>
+<header class="topbar">
+  <div class="bar-inner">
+    <div class="brand"><span class="brand-dot"></span>对话识别存档</div>
+    <nav class="nav">
+      <button class="nav-btn active" data-view="home" type="button">识别</button>
+      <button class="nav-btn" data-view="archive" type="button">存档<span id="archive-count" class="count hidden">0</span></button>
+    </nav>
   </div>
+</header>
 
-  <section class="pane" id="pane-url">
-    <label class="field">
-      <span>分享链接</span>
-      <input id="url" type="text" placeholder="https://chat.deepseek.com/share/xxxx 或 https://chatgpt.com/share/uuid 或 https://claude.ai/share/uuid" autocomplete="off" spellcheck="false">
-    </label>
-    <div class="row">
-      <label class="field small">
-        <span>时区</span>
-        <select id="tz">
-          <option value="Asia/Shanghai" selected>Asia/Shanghai（北京时间）</option>
-          <option value="UTC">UTC</option>
-          <option value="Asia/Tokyo">Asia/Tokyo</option>
-          <option value="Europe/London">Europe/London</option>
-          <option value="America/New_York">America/New_York</option>
-          <option value="Australia/Sydney">Australia/Sydney</option>
-        </select>
-      </label>
-      <button class="primary" id="go-url">生成文档</button>
+<main class="wrap">
+  <section id="view-home" class="view home-view">
+    <div class="hero-card">
+      <h1>AI 对话，直接变文档</h1>
+      <p class="sub">粘贴 DeepSeek / ChatGPT / Claude 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档，自动进入存档。</p>
+      <div class="input-row">
+        <input id="url" type="text" placeholder="https://chat.deepseek.com/share/…" autocomplete="off" spellcheck="false">
+        <button id="go" class="btn primary" type="button">识别存档</button>
+      </div>
+      <div class="opts-row">
+        <label class="opt">时区 <select id="tz" class="tz"></select></label>
+        <button id="toggle-paste" class="link" type="button">没有链接？粘贴全文</button>
+      </div>
+      <div id="paste-box" class="paste-box hidden">
+        <textarea id="text" rows="8" placeholder="把对话全文贴进来，会照样生成文档并进入存档。"></textarea>
+        <div class="paste-meta">
+          <input id="paste-title" type="text" placeholder="标题（可选）">
+          <input id="paste-date" type="date">
+          <select id="tz-paste" class="tz"></select>
+          <button id="go-paste" class="btn primary" type="button">识别存档</button>
+        </div>
+        <p class="paste-hint">认不出角色时整段成文；想分角色，在每段前加一行「用户：」「DeepSeek：」「ChatGPT：」「Claude：」。</p>
+      </div>
+      <div id="status" class="status hidden"></div>
     </div>
-    <p class="hint">支持 chat.deepseek.com/share/*、chatgpt.com/share/*（含 chat.openai.com）、claude.ai/share/*。链接失效、被拦或需登录时，改用「粘贴全文」。</p>
+
+    <section id="recent" class="recent hidden">
+      <div class="section-head">
+        <h2>最近存档</h2>
+        <button class="link" data-view="archive" type="button">查看全部</button>
+      </div>
+      <div id="recent-list" class="cards"></div>
+    </section>
   </section>
 
-  <section class="pane hidden" id="pane-paste">
-    <label class="field">
-      <span>对话全文</span>
-      <textarea id="text" rows="10" placeholder="把分享页里全选复制的内容粘进来，或者按下面的格式自己整理。"></textarea>
-    </label>
-    <div class="row">
-      <label class="field small">
-        <span>文档标题（可选）</span>
-        <input id="paste-title" type="text" placeholder="留空则用首行内容">
-      </label>
-      <label class="field small">
-        <span>归档日期</span>
-        <input id="paste-date" type="date">
-      </label>
-    </div>
-    <p class="hint">
-      认不出角色时整段作为一条记录，仍然会生成文档。想分角色，可这样写：<br>
-      <code>用户：帮我写个脚本</code><br>
-      <code>ChatGPT：好的，先看需求……</code>
-    </p>
-    <div class="row">
-      <label class="field small">
-        <span>时区</span>
-        <select id="tz-paste">
-          <option value="Asia/Shanghai" selected>Asia/Shanghai（北京时间）</option>
-          <option value="UTC">UTC</option>
-          <option value="Asia/Tokyo">Asia/Tokyo</option>
-          <option value="Europe/London">Europe/London</option>
-          <option value="America/New_York">America/New_York</option>
-          <option value="Australia/Sydney">Australia/Sydney</option>
-        </select>
-      </label>
-      <button class="primary" id="go-paste">生成文档</button>
-    </div>
-  </section>
-
-  <section class="status hidden" id="status"></section>
-
-  <section class="result hidden" id="result">
+  <section id="view-result" class="view hidden">
     <div class="result-head">
-      <div>
+      <div class="result-title-wrap">
+        <button id="back" class="btn ghost" type="button">返回</button>
         <h2 id="r-title"></h2>
-        <div class="chips" id="r-meta"></div>
+        <div id="r-meta" class="chips"></div>
       </div>
-      <div class="actions">
-        <a class="btn" id="dl-html" href="#" download>下载 HTML</a>
-        <a class="btn" id="dl-md" href="#" download>下载 Markdown</a>
+      <div class="result-actions">
+        <button id="toggle-md" class="btn" type="button">查看 Markdown</button>
+        <a id="dl-html" class="btn primary" download>下载 HTML</a>
+        <a id="dl-md" class="btn" download>下载 Markdown</a>
       </div>
     </div>
-    <div class="split">
-      <div class="preview">
-        <div class="preview-bar">排版预览</div>
-        <iframe id="preview" title="文档预览"></iframe>
-      </div>
-      <div class="mdbox">
-        <div class="preview-bar">Markdown 预览</div>
-        <pre id="md-preview"></pre>
-      </div>
+    <div class="result-body">
+      <iframe id="preview" title="文档预览"></iframe>
+      <pre id="md-view" class="md-view hidden"></pre>
     </div>
   </section>
 
-  <footer class="foot">本地运行，不保存你的对话；文档只存在于当前进程内存里，重启即清空。</footer>
+  <section id="view-archive" class="view hidden">
+    <div class="section-head">
+      <h2>存档</h2>
+      <span id="archive-count2" class="muted"></span>
+    </div>
+    <div id="archive-list" class="cards"></div>
+    <p id="archive-empty" class="empty hidden">还没有存档。回到「识别」，粘一条分享链接试试。</p>
+  </section>
 </main>
+
+<div id="toast" class="toast hidden"></div>
 <script src="/app.js"></script>
 </body>
 </html>
