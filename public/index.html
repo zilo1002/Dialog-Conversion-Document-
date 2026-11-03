@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSeek 分享链接 → 按日期排版的文档</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main class="app">
+  <header class="head">
+    <h1>AI 对话 → 文档</h1>
+    <p class="sub">粘贴 DeepSeek / ChatGPT / Claude 的分享链接，抓取完整对话，按日期排版成 HTML 与 Markdown。</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-mode="url" role="tab">分享链接</button>
+    <button class="tab" data-mode="paste" role="tab">粘贴全文</button>
+  </div>
+
+  <section class="pane" id="pane-url">
+    <label class="field">
+      <span>分享链接</span>
+      <input id="url" type="text" placeholder="https://chat.deepseek.com/share/xxxx 或 https://chatgpt.com/share/uuid 或 https://claude.ai/share/uuid" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="row">
+      <label class="field small">
+        <span>时区</span>
+        <select id="tz">
+          <option value="Asia/Shanghai" selected>Asia/Shanghai（北京时间）</option>
+          <option value="UTC">UTC</option>
+          <option value="Asia/Tokyo">Asia/Tokyo</option>
+          <option value="Europe/London">Europe/London</option>
+          <option value="America/New_York">America/New_York</option>
+          <option value="Australia/Sydney">Australia/Sydney</option>
+        </select>
+      </label>
+      <button class="primary" id="go-url">生成文档</button>
+    </div>
+    <p class="hint">支持 chat.deepseek.com/share/*、chatgpt.com/share/*（含 chat.openai.com）、claude.ai/share/*。链接失效、被拦或需登录时，改用「粘贴全文」。</p>
+  </section>
+
+  <section class="pane hidden" id="pane-paste">
+    <label class="field">
+      <span>对话全文</span>
+      <textarea id="text" rows="10" placeholder="把分享页里全选复制的内容粘进来，或者按下面的格式自己整理。"></textarea>
+    </label>
+    <div class="row">
+      <label class="field small">
+        <span>文档标题（可选）</span>
+        <input id="paste-title" type="text" placeholder="留空则用首行内容">
+      </label>
+      <label class="field small">
+        <span>归档日期</span>
+        <input id="paste-date" type="date">
+      </label>
+    </div>
+    <p class="hint">
+      认不出角色时整段作为一条记录，仍然会生成文档。想分角色，可这样写：<br>
+      <code>用户：帮我写个脚本</code><br>
+      <code>ChatGPT：好的，先看需求……</code>
+    </p>
+    <div class="row">
+      <label class="field small">
+        <span>时区</span>
+        <select id="tz-paste">
+          <option value="Asia/Shanghai" selected>Asia/Shanghai（北京时间）</option>
+          <option value="UTC">UTC</option>
+          <option value="Asia/Tokyo">Asia/Tokyo</option>
+          <option value="Europe/London">Europe/London</option>
+          <option value="America/New_York">America/New_York</option>
+          <option value="Australia/Sydney">Australia/Sydney</option>
+        </select>
+      </label>
+      <button class="primary" id="go-paste">生成文档</button>
+    </div>
+  </section>
+
+  <section class="status hidden" id="status"></section>
+
+  <section class="result hidden" id="result">
+    <div class="result-head">
+      <div>
+        <h2 id="r-title"></h2>
+        <div class="chips" id="r-meta"></div>
+      </div>
+      <div class="actions">
+        <a class="btn" id="dl-html" href="#" download>下载 HTML</a>
+        <a class="btn" id="dl-md" href="#" download>下载 Markdown</a>
+      </div>
+    </div>
+    <div class="split">
+      <div class="preview">
+        <div class="preview-bar">排版预览</div>
+        <iframe id="preview" title="文档预览"></iframe>
+      </div>
+      <div class="mdbox">
+        <div class="preview-bar">Markdown 预览</div>
+        <pre id="md-preview"></pre>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">本地运行，不保存你的对话；文档只存在于当前进程内存里，重启即清空。</footer>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

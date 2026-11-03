@@ -1,0 +1,9 @@
+node_modules
+*.log
+.env
+.env.*
+.git
+.gitignore
+.DS_Store
+test
+verify.mjs
