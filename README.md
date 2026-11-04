@@ -1,6 +1,10 @@
 # AI 对话识别存档（DeepSeek / ChatGPT / Claude）
 
-[![Deploy to Render](https://render.com/images/deploy.svg)](https://render.com/deploy?repo=https://github.com/<你的用户名>/deepseek-to-doc)
+[![Deploy to Render](https://render.com/images/deploy.svg)](https://render.com/deploy?repo=https://github.com/zilol002/Dialog-Conversion-Document-)
+
+## 仓库与部署名
+
+这份 README 里的部署链接是按实际仓库写好的：GitHub 用户名 zilol002，仓库名 Dialog-Conversion-Document-。部署按钮和部署一节里的链接都指向 https://github.com/zilol002/Dialog-Conversion-Document-。如果你推送时用了别的仓库名，把 README 里这几处链接中的仓库名换成你自己的仓库地址即可，按钮就能直接识别你的仓库。
 
 打开网页就是完整界面：中间一个输入框，粘贴分享链接点「识别存档」，直接生成按日期排版的 HTML 与 Markdown 文档并自动存档，历史文档可反复下载、可删除。
 
@@ -123,7 +127,7 @@ git init
 git add .
 git commit -m "DeepSeek share link to dated HTML/Markdown documents"
 # 在 GitHub 上新建一个空仓库后：
-git remote add origin git@github.com:<你的用户名>/deepseek-to-doc.git
+git remote add origin git@github.com:zilol002/Dialog-Conversion-Document-.git
 git branch -M main
 git push -u origin main
 ```
@@ -135,7 +139,7 @@ git push -u origin main
 推荐路径不需要本地装任何东西：GitHub 推送 → Render 页面点一次 → 拿到固定网址。构建命令 `npm install`、启动命令 `npm start`、健康检查 `/api/health`（render.yaml 已配好）；端口代码里读 `process.env.PORT`（本地没设时默认 5178），平台注入的 PORT 自动生效。
 
 1. 把仓库推到 GitHub（见上一节的命令）。
-2. 打开 `https://render.com/deploy?repo=<你的仓库地址>`（README 顶部有同一个按钮），登录后点 Apply / Create Web Service，等一两分钟。
+2. 打开 https://render.com/deploy?repo=https://github.com/zilol002/Dialog-Conversion-Document-（README 顶部有同一个按钮），登录后点 Apply / Create Web Service，等一两分钟。仓库名不同的话，把链接里的仓库名换成你的。
 3. 拿到固定网址（形如 `https://deepseek-to-doc.onrender.com`），打开就是完整界面，手机浏览器也能用。
 
 免费实例限制：15 分钟无人访问会休眠，首次访问要等几秒；实例磁盘随重启/重新部署重置，`data/` 里的存档会丢（见「已知限制」）。
