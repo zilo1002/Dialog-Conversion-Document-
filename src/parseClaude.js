@@ -46,7 +46,14 @@ function toMessages(chatMessages) {
     } else if (typeof m.content === 'string') content = m.content;
     else if (typeof m.text === 'string') content = m.text;
     content = content.trim();
-    if (content) out.push({ role, ts: toMillis(m.created_at), content });
+    if (content) {
+      const idx = Number(m?.index);
+      out.push({ role, ts: toMillis(m.created_at), content, index: Number.isFinite(idx) ? idx : null });
+    }
+  }
+  // 带逐条 index 时按 index 排序（页面渲染顺序），数组顺序不保证时也能还原先后
+  if (out.length && out.every((e) => e.index != null)) {
+    out.sort((a, b) => a.index - b.index);
   }
   return out;
 }

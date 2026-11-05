@@ -97,6 +97,8 @@ GET https://chat.deepseek.com/api/v0/share/content?share_id=<id>
 - 内容里的原始 HTML 会被转义，避免把别人对话里的标签当页面结构执行。
 - 纯静态 HTML，不带脚本，长对话也不会卡；另附打印样式。
 
+消息顺序按对话先后输出，保证「先问后答」：DeepSeek 按 parent_id 链重排（接口数组不保证链序，且同一问答回的用户/助手时间戳可能相同），ChatGPT 只走消息树的当前分支（重新生成的旧变体不重复导出），Claude 有 index 按 index 排；时间戳相同或缺失时保持解析出的先后顺序，不靠时间戳重排。
+
 ## 兜底路径
 
 1. **接口失败自动回退**：接口报错时，服务端会再抓一次分享页 HTML，先在 `<script>` 里找内嵌的 `"messages":[...]` JSON，再退到 `cheerio` 的 DOM 启发式提取（`.ds-markdown` 之类），能拿到就照常出文档，并在文档里注明用的是兜底解析。

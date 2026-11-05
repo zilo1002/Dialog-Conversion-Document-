@@ -82,11 +82,61 @@ function fragmentsToParts(fragments) {
 }
 
 /**
+ * 按 parent_id 把接口返回的扁平数组重排成对话链顺序。
+ * DeepSeek 接口的 messages 数组不保证是链序（它自己的前端也是拿 parent_id
+ * 在数组里 find 子消息），而同一次提问的用户/助手消息 inserted_at 可能完全相同
+ * （同一请求写入），只按时间戳或数组顺序排会出现「回答跑到提问前面」。
+ * 跟官方前端一致：每个父消息取数组里第一条子消息，沿链走到底；孤儿消息按原顺序补在后面。
+ */
+function orderMessages(rawMessages) {
+  if (!Array.isArray(rawMessages) || rawMessages.length < 2) return rawMessages || [];
+  const ids = new Set(rawMessages.map((m) => m?.message_id).filter((v) => v != null));
+  if (ids.size === 0) return rawMessages;
+  const firstChildOf = new Map();
+  for (const m of rawMessages) {
+    const pid = m?.parent_id;
+    if (pid != null && !firstChildOf.has(pid)) firstChildOf.set(pid, m);
+  }
+  const root = rawMessages.find((m) => m?.parent_id == null || !ids.has(m.parent_id)) || rawMessages[0];
+  const ordered = [];
+  const seen = new Set();
+  let cur = root;
+  while (cur) {
+    const id = cur?.message_id;
+    if (id != null) {
+      if (seen.has(id)) break; // 防环
+      seen.add(id);
+    }
+    ordered.push(cur);
+    const next = firstChildOf.get(id);
+    cur = next && !seen.has(next?.message_id) ? next : null;
+  }
+  // 没接上的消息：只要它的父消息已入列就按数组顺序续上（应对数组乱序），
+  // 最后实在接不上的（分叉的旧变体等）按原数组顺序补在末尾，不丢内容。
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const m of rawMessages) {
+      const id = m?.message_id;
+      if (id == null || seen.has(id)) continue;
+      const pid = m?.parent_id;
+      if (pid != null && seen.has(pid)) {
+        seen.add(id);
+        ordered.push(m);
+        progressed = true;
+      }
+    }
+  }
+  for (const m of rawMessages) if (m?.message_id == null || !seen.has(m.message_id)) ordered.push(m);
+  return ordered;
+}
+
+/**
  * 解析 /api/v0/share/content 的 biz_data。
  */
 export function parseSharePayload(bizData, meta = {}) {
   const warnings = [];
-  const rawMessages = Array.isArray(bizData?.messages) ? bizData.messages : [];
+  const rawMessages = orderMessages(Array.isArray(bizData?.messages) ? bizData.messages : []);
 
   const messages = rawMessages.map((m, i) => {
     const role = ROLE_MAP[String(m?.role || '').toUpperCase()] || 'assistant';

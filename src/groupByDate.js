@@ -34,10 +34,9 @@ export function groupByDate(conversation) {
 
   groups.sort((a, b) => String(a.key).localeCompare(String(b.key)));
   for (const g of groups) {
-    g.messages.sort((a, b) => {
-      if (a.hasTs && b.hasTs) return a.ts - b.ts || a.order - b.order;
-      return a.order - b.order;
-    });
+    // 组内保持解析器给出的对话顺序（order），不再按时间戳重排：
+    // 时间戳相同（同一次请求写入）或缺失时，按 ts 排会把回答挪到提问前面。
+    g.messages.sort((a, b) => a.order - b.order);
   }
   return groups;
 }

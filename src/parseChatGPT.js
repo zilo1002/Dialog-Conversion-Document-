@@ -57,7 +57,9 @@ function walkMapping(mapping) {
     if (content && (role === 'user' || role === 'assistant')) {
       messages.push({ role, ts: toMillis(msg.create_time), content });
     }
-    for (const child of node.children || []) walk(child);
+    // 只走当前分支：children[0] 是页面正在显示的那条回答，
+    // 重新生成的历史变体不导出，避免同一条回答重复出现、把后面的提问挤到下面。
+    for (const child of (node.children || []).slice(0, 1)) walk(child);
   };
   walk(rootId);
   return messages;
