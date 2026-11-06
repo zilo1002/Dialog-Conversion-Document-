@@ -172,3 +172,21 @@ body {
 .result-body { border-radius: 12px; }
   #preview, .md-view { height: 62vh; }
 }
+
+/* 行内重命名 */
+.card-title .rename-input {
+  width: 100%;
+  min-width: 140px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  font-size: 14px;
+  border: 1px solid #7c5cff;
+  border-radius: 8px;
+  background: #fff;
+  color: #1c1c28;
+  margin-bottom: 6px;
+}
+.btn.sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}

@@ -14,7 +14,12 @@ const app = express();
 // Render 等平台在反向代理后面：信任 X-Forwarded-*，req.protocol 才是公网的 https
 app.set('trust proxy', 1);
 app.use(express.json({ limit: MAX_BODY }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    // 重新部署后浏览器必须拿到新页面，不能吃旧缓存
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+  }),
+);
 
 // 识别过的文档持久化到 data/（公开分享出口 /share/<id> 需要它）；
 // Render 免费实例磁盘重置会丢，备份与持久化见 README。
@@ -63,6 +68,7 @@ async function respondConverted(req, res, built) {
     ok: true,
     id: entry.id,
     createdAt: entry.createdAt,
+    summary,
     ...summary,
     shareUrl: absoluteShareUrl(req, entry.id),
     // 完整记录随响应回给浏览器：存档进 IndexedDB（本机），页面不再依赖服务端读取接口

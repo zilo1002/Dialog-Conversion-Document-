@@ -1,4 +1,5 @@
 import { localDateString } from '/localdate.js';
+import { applyTitle } from '/retitle.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -31,18 +32,23 @@ function idbReq(request) {
     request.onerror = () => reject(request.error);
   });
 }
-async function withStore(mode, fn) {
-  if (!idbOk) throw new Error('no-idb');
-  const db = await idbReq(indexedDB.open(DB_NAME, 1)).catch((err) => { throw err; });
-  const tx = db.transaction(STORE, mode);
-  const result = await fn(tx.objectStore(STORE), tx);
-  tx.oncomplete = () => {};
-  return result;
+// 打开（首次则创建）本机存档库：onupgradeneeded 里建对象仓，否则库里没有 entries
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error('indexedDB 被其他页面占用'));
+  });
 }
 async function localArchiveAll() {
   if (!idbOk) return [...memoryArchive].sort((a, b) => b.createdAt - a.createdAt);
   try {
-    const db = await idbReq(indexedDB.open(DB_NAME, 1));
+    const db = await idbOpen();
     if (!db.objectStoreNames.contains(STORE)) return [];
     const tx = db.transaction(STORE, 'readonly');
     const items = await idbReq(tx.objectStore(STORE).getAll());
@@ -59,7 +65,7 @@ async function localArchivePut(entry) {
     return;
   }
   try {
-    const db = await idbReq(indexedDB.open(DB_NAME, 1));
+    const db = await idbOpen();
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(entry);
   } catch {
@@ -74,7 +80,7 @@ async function localArchiveDelete(id) {
     return;
   }
   try {
-    const db = await idbReq(indexedDB.open(DB_NAME, 1));
+    const db = await idbOpen();
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).delete(id);
   } catch {
@@ -156,7 +162,9 @@ function openResult(data) {
   $('#r-meta').innerHTML = chipsFor(data);
   $('#share-link').href = shareLinkOf(data);
   $('#share-link').textContent = shareLinkOf(data);
-  $('#preview').srcdoc = data.html || '';
+  const pv = $('#preview');
+  pv.removeAttribute('src'); // 防止旧的 src 与 srcdoc 叠加，每次都按当前内容重载
+  pv.srcdoc = data.html || '';
   $('#md-view').textContent = data.markdown || '';
   $('#md-view').classList.add('hidden');
   $('#preview').classList.remove('hidden');
@@ -227,6 +235,7 @@ function cardFor(item) {
       <button class="btn" data-act="dl-html" type="button">HTML</button>
       <button class="btn" data-act="dl-md" type="button">Markdown</button>
       <button class="btn" data-act="dl-tr" type="button">对话稿</button>
+      <button class="btn" data-act="rename" type="button">重命名</button>
       <button class="btn" data-act="sharelink" type="button">复制链接</button>
       <button class="btn danger" data-act="del" type="button">删除</button>
     </div>`;
@@ -235,6 +244,33 @@ function cardFor(item) {
   el.querySelector('[data-act="dl-md"]').addEventListener('click', () => downloadBlob((s.filenames && s.filenames.markdown) || 'document.md', item.markdown || '', 'text/markdown; charset=utf-8'));
   el.querySelector('[data-act="dl-tr"]').addEventListener('click', () => downloadBlob((s.filenames && s.filenames.transcript) || 'transcript.md', item.transcript || '', 'text/markdown; charset=utf-8'));
   el.querySelector('[data-act="sharelink"]').addEventListener('click', () => copyText(shareLinkOf(item), '分享链接已复制（服务端公开出口）'));
+  el.querySelector('[data-act="rename"]').addEventListener('click', () => {
+    const titleEl = el.querySelector('.card-title');
+    const cur = (item.summary && item.summary.title) || '';
+    titleEl.innerHTML = `<input class="rename-input" value="${escapeHtml(cur)}" maxlength="80" aria-label="新标题" /> <button class="btn sm" data-r="save" type="button">保存</button> <button class="btn sm" data-r="cancel" type="button">取消</button>`;
+    const input = titleEl.querySelector('.rename-input');
+    input.focus();
+    input.select();
+    const save = async () => {
+      try {
+      const t = input.value.trim();
+      if (!t) { toast('标题不能为空'); return; }
+      if (t === cur) { refreshArchive(); return; }
+      const updated = applyTitle(item, t);
+      await localArchivePut(updated);
+      if (current && current.id === item.id) openResult(updated);
+      refreshArchive();
+      toast('已重命名：列表、预览标题和下载文件名都同步了（公开分享页保持原标题）');
+      } catch (err) { toast('改名失败：' + err.message); console.error(err); }
+    };
+    const cancel = () => refreshArchive();
+    titleEl.querySelector('[data-r="save"]').addEventListener('click', save);
+    titleEl.querySelector('[data-r="cancel"]').addEventListener('click', cancel);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+      if (e.key === 'Escape') cancel();
+    });
+  });
   const delBtn = el.querySelector('[data-act="del"]');
   delBtn.addEventListener('click', async () => {
     if (delBtn.dataset.confirm !== '1') {
