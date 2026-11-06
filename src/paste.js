@@ -14,7 +14,7 @@ const CHROME_LINES = [
 ];
 
 const USER_MARK = /^\s*(?:\*\*)?\s*[\[【]?\s*(用户|提问者|我|user|human|you)\s*(?:\s+(?:said|says|说))?\s*[\]】]?\s*(?:\*\*)?\s*[:：]\s*(.*)$/i;
-const AI_MARK = /^\s*(?:\*\*)?\s*[\[【]?\s*(deepseek|chatgpt|claude|gpt|assistant|ai|助手|模型|回答)\s*(?:\s+(?:said|says|说))?\s*[\]】]?\s*(?:\*\*)?\s*[:：]\s*(.*)$/i;
+const AI_MARK = /^\s*(?:\*\*)?\s*[\[【]?\s*(deepseek|assistant|ai|助手|模型|回答)\s*(?:\s+(?:said|says|说))?\s*[\]】]?\s*(?:\*\*)?\s*[:：]\s*(.*)$/i;
 const THINK_MARK = /^\s*(?:thought for\s+[\d.]+\s*(?:seconds?|secs?|s)|已?思考[（(]?用时\s*[\d.]+\s*秒[)）]?|思考了\s*[\d.]+\s*秒|深度思考)\s*$/i;
 
 function isChrome(line) {
@@ -44,7 +44,7 @@ function pushMessage(list, role, text) {
 /**
  * 「粘贴全文」兜底解析。
  * 支持的写法（任一）：
- *   1. 角色标记行：用户：/ DeepSeek： / User: / Assistant: / 【用户】
+ *   1. 角色标记行：用户：/ DeepSeek： / Assistant: / 【用户】
  *   2. DeepSeek 网页复制出来的原文里带「Thought for N seconds」，按它切分问答
  *   3. 都没有 → 整段作为一条未标注角色的内容，仍然生成文档
  */
@@ -95,7 +95,7 @@ export function parsePastedText(rawText, options = {}) {
       if (role) buffer.push(line);
     }
     flush();
-    warnings.push('按角色标记（用户 / DeepSeek / ChatGPT / Claude）切分了消息。');
+    warnings.push('按角色标记（用户 / DeepSeek）切分了消息。');
   } else {
     const thinkHits = lines.map((l, i) => (THINK_MARK.test(l) ? i : -1)).filter((i) => i >= 0);
     if (thinkHits.length > 0) {
@@ -137,13 +137,7 @@ export function parsePastedText(rawText, options = {}) {
   warnings.push('粘贴模式没有逐条时间戳，全部按你指定的日期归档，时间粒度只到日。');
 
   const lower = text.toLowerCase();
-  const pasteSource = /chatgpt/.test(lower)
-    ? 'ChatGPT'
-    : /claude/.test(lower)
-      ? 'Claude'
-      : /deepseek/.test(lower)
-        ? 'DeepSeek'
-        : '粘贴内容';
+  const pasteSource = /deepseek/.test(lower) ? 'DeepSeek' : '粘贴内容';
 
   return {
     title,

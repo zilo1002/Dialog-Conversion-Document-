@@ -39,11 +39,22 @@ function toast(text) {
   setTimeout(() => el.classList.add('hidden'), 2200);
 }
 
+function readOptions() {
+  return {
+    stripThinking: $('#opt-strip-thinking').checked,
+    showTitle: $('#opt-show-title').checked,
+    showLink: $('#opt-show-link').checked,
+    showTime: $('#opt-show-time').checked,
+  };
+}
+
 function chipsFor(data) {
   const chips = [];
   if (data.sourceLabel) chips.push(`<span class="chip src">${escapeHtml(data.sourceLabel)}</span>`);
   chips.push(`<span class="chip">${data.messageCount} 条消息</span>`);
-  chips.push(`<span class="chip">${(data.days || []).length} 个日期</span>`);
+  if (data.options && data.options.showTime === false) chips.push('<span class="chip">未保存时间</span>');
+  else chips.push(`<span class="chip">${(data.days || []).length} 个日期</span>`);
+  if (data.options && data.options.stripThinking) chips.push('<span class="chip">只留正文</span>');
   if (data.modelLabel) chips.push(`<span class="chip">${escapeHtml(data.modelLabel)}</span>`);
   if (data.timeSource === 'message') chips.push('<span class="chip">逐条时间</span>');
   else if (data.timeSource === 'day') chips.push('<span class="chip">按日归档</span>');
@@ -60,6 +71,8 @@ function openResult(data) {
   $('#dl-html').setAttribute('download', (data.filenames && data.filenames.html) || 'document.html');
   $('#dl-md').href = `/api/result/${data.id}/download?format=md`;
   $('#dl-md').setAttribute('download', (data.filenames && data.filenames.markdown) || 'document.md');
+  $('#dl-transcript').href = `/api/result/${data.id}/download?format=transcript`;
+  $('#dl-transcript').setAttribute('download', (data.filenames && data.filenames.transcript) || 'transcript.md');
   $('#preview').src = `/api/result/${data.id}/preview`;
   $('#md-view').classList.add('hidden');
   $('#preview').classList.remove('hidden');
@@ -96,7 +109,7 @@ function cardFor(item) {
   const el = document.createElement('div');
   el.className = 'card';
   const dateBits = (s.days || []).map((d) => d.key).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k));
-  const dateText = dateBits.length === 0 ? '日期未知' : dateBits[0] === dateBits[dateBits.length - 1] ? dateBits[0] : `${dateBits[0]} ~ ${dateBits[dateBits.length - 1]}`;
+  const dateText = s.options && s.options.showTime === false ? '未保存时间' : dateBits.length === 0 ? '日期未知' : dateBits[0] === dateBits[dateBits.length - 1] ? dateBits[0] : `${dateBits[0]} ~ ${dateBits[dateBits.length - 1]}`;
   el.innerHTML = `
     <div class="card-title" title="${escapeHtml(s.title || '')}">${escapeHtml(s.title || '未命名文档')}</div>
     <div class="card-meta">
@@ -108,6 +121,7 @@ function cardFor(item) {
       <button class="btn" data-act="view" type="button">查看</button>
       <a class="btn" href="/api/result/${item.id}/download?format=html" download>HTML</a>
       <a class="btn" href="/api/result/${item.id}/download?format=md" download>Markdown</a>
+      <a class="btn" href="/api/result/${item.id}/download?format=transcript" download>对话稿</a>
       <button class="btn danger" data-act="del" type="button">删除</button>
     </div>`;
   el.querySelector('[data-act="view"]').addEventListener('click', () => openResult({ id: item.id, ...s }));
@@ -160,7 +174,7 @@ $('#paste-date').value = new Date().toISOString().slice(0, 10);
 $('#go').addEventListener('click', () => {
   const url = $('#url').value.trim();
   if (!url) { setStatus('error', '先粘贴一条分享链接。'); return; }
-  convert('/api/convert', { url, tz: $('#tz').value }, $('#go'));
+  convert('/api/convert', { url, tz: $('#tz').value, options: readOptions() }, $('#go'));
 });
 
 $('#go-paste').addEventListener('click', () => {
@@ -171,6 +185,7 @@ $('#go-paste').addEventListener('click', () => {
     title: $('#paste-title').value.trim(),
     date: $('#paste-date').value,
     tz: $('#tz-paste').value,
+    options: readOptions(),
   }, $('#go-paste'));
 });
 
@@ -179,6 +194,28 @@ $('#toggle-paste').addEventListener('click', () => {
 });
 
 $('#back').addEventListener('click', () => showView('home'));
+
+$('#copy-transcript').addEventListener('click', async () => {
+  const btn = $('#copy-transcript');
+  if (!current) return;
+  try {
+    const res = await fetch(`/api/result/${current.id}/transcript`);
+    const text = await res.text();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast('对话稿已复制，可直接粘贴给其他 AI 应用');
+  } catch (err) {
+    toast(`复制失败：${err.message}，可点「下载对话稿」`);
+  }
+});
 
 $('#toggle-md').addEventListener('click', async () => {
   const showingMd = !$('#md-view').classList.contains('hidden');

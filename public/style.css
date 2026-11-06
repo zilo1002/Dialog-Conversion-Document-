@@ -93,6 +93,10 @@ body {
 }
 .input-row input:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
 .input-row .btn { padding: 12px 22px; }
+.gen-opts { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 14px 0 4px; padding: 12px 14px; border: 1px dashed var(--line-strong, #d8d5ce); border-radius: 12px; background: rgba(255,255,255,0.6); }
+.gen-opts-title { font-size: 12px; color: var(--ink-soft, #5b636d); }
+.opt-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink, #1f2328); cursor: pointer; }
+.opt-check input { accent-color: var(--accent, #4d6bfe); width: 15px; height: 15px; }
 .opts-row { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; font-size: 13px; color: var(--muted); flex-wrap: wrap; gap: 8px; }
 .opt { display: inline-flex; align-items: center; gap: 6px; }
 .tz { font: inherit; font-size: 13px; color: var(--ink); border: 1px solid var(--line); border-radius: 9px; padding: 5px 8px; background: #fbfcfe; }

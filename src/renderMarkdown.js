@@ -37,15 +37,16 @@ function renderPart(part) {
 export function renderMarkdown(conversation, groups) {
   const line = [];
   const totalMessages = conversation.messages.length;
+  const showTime = !(conversation.options && conversation.options.showTime === false);
 
   line.push(`# ${conversation.title}`);
   line.push('');
   line.push('> AI 对话存档');
   line.push(`> 来源：${conversation.sourceLabel || '未知来源'}`);
   if (conversation.sourceUrl) line.push(`> 原始链接：${conversation.sourceUrl}`);
-  line.push(`> 对话日期：${conversationDateLabel(conversation, groups)}`);
+  if (showTime) line.push(`> 对话日期：${conversationDateLabel(conversation, groups)}`);
   line.push(`> 导出时间：${dateTimeLabel(conversation.fetchedAt, conversation.timeZone)}（${conversation.timeZone}）`);
-  line.push(`> 消息：${totalMessages} 条，分在 ${groups.length} 个日期`);
+  line.push(`> 消息：${totalMessages} 条${showTime ? `，分在 ${groups.length} 个日期` : ''}`);
   if (conversation.modelLabel) line.push(`> 模型：${conversation.modelLabel}`);
   line.push(`> 时间说明：${conversation.timeNote}`);
   line.push('');

@@ -1,4 +1,4 @@
-# AI 对话识别存档（DeepSeek / ChatGPT / Claude）
+# AI 对话识别存档（DeepSeek）
 
 [![Deploy to Render](https://render.com/images/deploy.svg)](https://render.com/deploy?repo=https://github.com/zilo1002/Dialog-Conversion-Document-)
 
@@ -6,7 +6,7 @@
 
 这份 README 里的部署链接是按实际仓库写好的：GitHub 用户名 zilo1002，仓库名 Dialog-Conversion-Document-。部署按钮和部署一节里的链接都指向 https://github.com/zilo1002/Dialog-Conversion-Document-。如果你推送时用了别的仓库名，把 README 里这几处链接中的仓库名换成你自己的仓库地址即可，按钮就能直接识别你的仓库。
 
-打开网页就是完整界面：中间一个输入框，粘贴分享链接点「识别存档」，直接生成按日期排版的 HTML 与 Markdown 文档并自动存档，历史文档可反复下载、可删除。
+打开网页就是完整界面：中间一个输入框，粘贴 DeepSeek 分享链接点「识别存档」，直接生成按日期排版的 HTML 与 Markdown 文档并自动存档，历史文档可反复下载、可删除。生成前可以勾选删掉思考过程、标题、原始链接、时间信息中的任何一项；生成结果里还包括一份给其他 AI 应用直接用的「AI 对话稿」。
 
 部署一次就好：把仓库推到 GitHub，点上面的按钮在 Render 部署，拿到固定网址就能一直用，本地不需要装任何东西（详见「部署」一节）。想在本地跑，按下面的「快速开始」。
 
@@ -22,27 +22,48 @@ npm start
 - Node 版本：18.17 以上（用到内置 `fetch`；开发验证用的是 Node 24）
 - 端口：默认 5178，可用 `PORT=8080 npm start` 改
 - 依赖：`express`（本地服务）、`cheerio`（HTML 兜底解析）、`marked`（Markdown 渲染）
-- 测试：`npm test`（23 个用例）
+- 测试：`npm test`（31 个用例）
 - 存档目录：默认项目下的 `data/`（每个文档一个 JSON，含元信息和两种文档内容），可用环境变量 `DATA_DIR` 改；`data/` 不进 git
 
 ## 支持的平台（实测结论 2026-11）
 
-| | DeepSeek | ChatGPT | Claude |
-|---|---|---|---|
-| 分享链接 | chat.deepseek.com/share/* | chatgpt.com/share/*（含 chat.openai.com） | claude.ai/share/* |
-| 数据在哪 | 公开接口 `/api/v0/share/content?share_id=` | 分享页 `<script id="__NEXT_DATA__">` 里 `serverResponse.data.mapping` 消息树 | 分享页 `__NEXT_DATA__` 里 `serverData.chat_messages` |
-| 逐条时间戳 | 有（`inserted_at`，秒） | 有（`create_time`，秒） | 有（`created_at`，ISO/秒） |
-| 标题 | 常是通用占位，用首条提问兜底 | `title` | `name` |
-| 本执行环境实测 | 已验证（接口返回完整对话） | 沙箱连不上 chatgpt.com；页面 SSR 已确认含正文，结构按公开导出工具的实测编写，附 DOM 兜底 | claude.ai 对本环境返回 region_unavailable（区域不可用）；结构按公开导出工具的实测编写 |
+只支持 DeepSeek：
 
-三个平台的解析都不绕过登录墙、验证码或地区限制：抓不到时返回明确原因并引导「粘贴全文」。测试里的 ChatGPT/Claude 样本是按上述结构构造的合成样本（`samples/sample-chatgpt-share.html`、`samples/sample-claude-share.html`），DeepSeek 样本是真实抓取的返回。
+| | DeepSeek |
+|---|---|
+| 分享链接 | chat.deepseek.com/share/* |
+| 数据在哪 | 公开接口 `/api/v0/share/content?share_id=` |
+| 逐条时间戳 | 有（`inserted_at`，秒） |
+| 标题 | 常是通用占位（`Shared Conversation`），用首条提问兜底 |
+| 实测 | 已验证：接口返回完整对话，含思考过程片段与逐条时间 |
+
+2026-11-06 按需求移除了 ChatGPT 与 Claude 的识别与解析接口，粘贴这两家的链接会明确提示「暂不支持」。解析不绕过登录墙、验证码或地区限制：抓不到时返回明确原因并引导「粘贴全文」。测试里的 DeepSeek 样本是真实抓取的返回（`samples/sample-share-api.json`）。
 
 ## 界面
 
-- 首屏：一个完整窗口，中间是链接输入框和「识别存档」按钮；没有链接时展开「粘贴全文」也能成文。
-- 识别后进入结果页：排版预览（文档本身按日期分节、逐条带时间）、元信息（来源、日期、消息数、时间说明）、下载 HTML / 下载 Markdown，可切换看 Markdown 原文。
-- 存档页：识别过的文档都在，卡片列出标题、来源、日期、条数，每张卡可查看、重新下载（HTML 和 Markdown 各一个按钮，可下多次）、删除（点两次确认）。首屏下方同时显示最近 3 条。
+- 首屏：一个完整窗口，中间是链接输入框和「识别存档」按钮；没有链接时展开「粘贴全文」也能成文。两种方式共用下面这排「生成选项」勾选。
+- 识别后进入结果页：排版预览（文档本身按日期分节、逐条带时间）、元信息（来源、日期、消息数、时间说明）、下载 HTML / 下载 Markdown、复制 AI 对话稿 / 下载对话稿，可切换看 Markdown 原文。
+- 存档页：识别过的文档都在，卡片列出标题、来源、日期、条数，每张卡可查看、重新下载（HTML / Markdown / 对话稿三个按钮，可下多次）、删除（点两次确认）。首屏下方同时显示最近 3 条。
 - 移动端可用：窄屏下输入框和按钮自动竖排，卡片单列。
+
+## 生成选项（保留什么、删掉什么）
+
+识别时界面上一排勾选，链接模式和粘贴模式共用，勾了什么，文档、对话稿和存档就按什么来存：
+
+| 选项 | 勾上（默认不勾）的效果 | 默认 |
+|---|---|---|
+| 只留正文 | 思考过程、联网搜索等非正文片段全部删除，只留用户与 DeepSeek 的正文问答；只剩非正文内容的消息整条移除 | 不勾（保留思考过程，文档里折叠） |
+| 保存标题 | 不勾时不用首条提问派生的标题，文档标题固定为「DeepSeek 对话」 | 勾 |
+| 保存原始链接 | 不勾时文档、对话稿、存档摘要里都不再出现原始链接 | 勾 |
+| 保存时间信息 | 不勾时文档不按日期分节、不带逐条时间，存档列表显示「未保存时间」 | 勾 |
+
+## AI 对话稿（给其他 AI 应用用）
+
+结果页和存档里除了 HTML / Markdown 文档，还多一种输出：「AI 对话稿」。它不做文档排版，是一份标准 Markdown 文本：标题、原始 DeepSeek 分享链接块，然后按对话先后用 `## 用户` / `## DeepSeek` 二级标题标注角色，正文原样保留，永远不含思考过程。
+
+关于「让市面上大众 AI 应用都能识别」要如实说明：各 AI 应用（ChatGPT、Claude、Kimi、Grok 等，包括 Today）没有统一的外链内容互认协议，谁都不保证能直接打开一条链接读取内容。所以对话稿采用最大兼容的形式：直接复制（结果页「复制 AI 对话稿」按钮）或下载后粘贴进任何 AI 应用的输入框，AI 都能按角色读懂并继续对话；对话稿里附的原始 DeepSeek 分享链接，能否被目标应用读取取决于该应用自己支不支持抓取外链。界面上也按此说明，不夸大。
+
+存档里保存什么同样跟着生成选项走：标题、原始链接、时间信息、思考过程，不勾的就不存进文档与摘要；存档文件本身仍保留两种文档加对话稿的全文，删除单条即全部删除。
 
 ## 抓取原理（实测结论，2026-11）
 
@@ -97,7 +118,7 @@ GET https://chat.deepseek.com/api/v0/share/content?share_id=<id>
 - 内容里的原始 HTML 会被转义，避免把别人对话里的标签当页面结构执行。
 - 纯静态 HTML，不带脚本，长对话也不会卡；另附打印样式。
 
-消息顺序按对话先后输出，保证「先问后答」：DeepSeek 按 parent_id 链重排（接口数组不保证链序，且同一问答回的用户/助手时间戳可能相同），ChatGPT 只走消息树的当前分支（重新生成的旧变体不重复导出），Claude 有 index 按 index 排；时间戳相同或缺失时保持解析出的先后顺序，不靠时间戳重排。
+消息顺序按对话先后输出，保证「先问后答」：DeepSeek 按 parent_id 链重排（接口数组不保证链序，且同一问答回的用户/助手时间戳可能相同）；时间戳相同或缺失时保持解析出的先后顺序，不靠时间戳重排。
 
 ## 兜底路径
 
@@ -111,8 +132,7 @@ GET https://chat.deepseek.com/api/v0/share/content?share_id=<id>
 
 - 接口不是官方公开 API，DeepSeek 随时可能改字段或加风控；改了就靠上面的兜底路径。
 - 分享接口返回的标题常常只是通用占位（实测 DeepSeek 就是 `Shared Conversation`），这时文档标题取首条提问前 28 个字，并在文档里标注。
-- ChatGPT / Claude 的解析基于其分享页内嵌的 `__NEXT_DATA__` 结构；这两个站点对无浏览器特征的请求可能弹 Cloudflare 验证或要求登录，遇到就换「粘贴全文」。Claude 对部分地区直接返回 region_unavailable，这是它的访问限制，本项目不绕过。
-- 三个平台里拿不到逐条时间戳时，文档会明确写「对话日期未知（导入日期 今天）」，不编造时间。
+- 拿不到逐条时间戳时，文档会明确写「对话日期未知（导入日期 今天）」，不编造时间。
 - 存档是写在本机/实例的 `data/` 目录里的。Render、Railway 免费实例的磁盘会随重启或重新部署重置，存档会丢；要长期保留，要么挂平台的持久磁盘，要么用自有服务器部署并把 `data/` 备份下来。
 - 只解析单条分享链接里的对话；需要登录才能看的对话抓不到。
 - 分享页里的「下载 / 复制」按钮文字属于页面装饰，复制全文时已自动去掉；但页面结构变了可能残留个别行，可在粘贴框里手动删。
@@ -175,17 +195,16 @@ deepseek-to-doc/
 ├── LICENSE                # MIT
 ├── server.js              # Express 服务：代理抓取、生成、预览、下载
 ├── src/
-│   ├── shareUrl.js        # 链接 → 平台 + share id（三平台分发）
-│   ├── parseChatGPT.js    # ChatGPT 分享页解析（__NEXT_DATA__ / DOM 兜底）
-│   ├── parseClaude.js     # Claude 分享页解析（__NEXT_DATA__）
-│   ├── parseCommon.js     # 解析公共工具
+│   ├── shareUrl.js        # 链接 → share id（只认 DeepSeek）
 │   ├── fetchShare.js      # 调分享接口（带超时、错误码映射）
-│   ├── parseShare.js      # 接口 JSON → 统一对话模型
+│   ├── parseShare.js      # 接口 JSON → 统一对话模型（parent_id 链排序）
 │   ├── htmlFallback.js    # 分享页 HTML 兜底解析
 │   ├── paste.js           # 粘贴全文解析
+│   ├── convert.js         # 生成选项套用 + 转换编排
 │   ├── groupByDate.js     # 按日期分组
 │   ├── renderHtml.js      # HTML 文档
 │   ├── renderMarkdown.js  # Markdown 文档
+│   ├── renderTranscript.js # AI 对话稿（给其他 AI 应用粘贴用）
 │   ├── markdown.js        # marked 封装（转义、标题降级、代码块标签）
 │   ├── localtime.js       # 时区换算
 │   └── filenames.js       # 文件名清洗

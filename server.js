@@ -18,7 +18,7 @@ const archive = new Archive(DATA_DIR);
 
 async function respondConverted(res, built) {
   const summary = summarize(built);
-  const entry = await archive.save({ summary, html: built.html, markdown: built.markdown });
+  const entry = await archive.save({ summary, html: built.html, markdown: built.markdown, transcript: built.transcript });
   res.json({
     ok: true,
     id: entry.id,
@@ -28,6 +28,7 @@ async function respondConverted(res, built) {
     download: {
       html: `/api/result/${entry.id}/download?format=html`,
       markdown: `/api/result/${entry.id}/download?format=md`,
+      transcript: `/api/result/${entry.id}/download?format=transcript`,
     },
   });
 }
@@ -53,8 +54,8 @@ function statusFor(err) {
 
 app.post('/api/convert', async (req, res) => {
   try {
-    const { url, tz } = req.body || {};
-    await respondConverted(res, await convertUrl(url, tz));
+    const { url, tz, options } = req.body || {};
+    await respondConverted(res, await convertUrl(url, tz, options));
   } catch (err) {
     res.status(statusFor(err)).json({ ok: false, code: err.code || 'UNKNOWN', message: err.message || '抓取失败', fallback: true });
   }
@@ -62,8 +63,8 @@ app.post('/api/convert', async (req, res) => {
 
 app.post('/api/convert/paste', async (req, res) => {
   try {
-    const { text, title, date, tz } = req.body || {};
-    await respondConverted(res, convertPaste({ text, title, date, tz }));
+    const { text, title, date, tz, options } = req.body || {};
+    await respondConverted(res, convertPaste({ text, title, date, tz, options }));
   } catch (err) {
     res.status(statusFor(err)).json({ ok: false, code: err.code || 'UNKNOWN', message: err.message || '转换失败' });
   }
@@ -103,13 +104,19 @@ app.get('/api/result/:id/markdown', async (req, res) => {
   res.type('text/plain; charset=utf-8').send(entry.markdown);
 });
 
+app.get('/api/result/:id/transcript', async (req, res) => {
+  const entry = await loadEntry(req, res);
+  if (!entry) return;
+  res.type('text/plain; charset=utf-8').send(entry.transcript || '');
+});
+
 app.get('/api/result/:id/download', async (req, res) => {
   const entry = await loadEntry(req, res);
   if (!entry) return;
-  const format = req.query.format === 'md' ? 'md' : 'html';
-  const filename = format === 'md' ? entry.summary.filenames.markdown : entry.summary.filenames.html;
-  const body = format === 'md' ? entry.markdown : entry.html;
-  res.setHeader('Content-Type', format === 'md' ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8');
+  const format = ['md', 'transcript'].includes(req.query.format) ? req.query.format : 'html';
+  const filename = entry.summary.filenames[format === 'md' ? 'markdown' : format === 'transcript' ? 'transcript' : 'html'];
+  const body = format === 'md' ? entry.markdown : format === 'transcript' ? entry.transcript : entry.html;
+  res.setHeader('Content-Type', format === 'html' ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8');
   res.setHeader(
     'Content-Disposition',
     `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,

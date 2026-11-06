@@ -6,6 +6,10 @@ import { dateKey, dateLabel, clockLabel } from './localtime.js';
  */
 export function groupByDate(conversation) {
   const { messages, timeZone } = conversation;
+  if (conversation.options && conversation.options.showTime === false) {
+    // 用户选择不保存时间信息：不分日期、不带逐条时间，整篇一节
+    return [{ key: 'all', label: '对话内容', messages: messages.map((msg, i) => ({ ...msg, order: i + 1, timeLabel: '', hasTs: false })) }];
+  }
   const groups = [];
   const map = new Map();
 
@@ -52,6 +56,7 @@ export function dateRangeLabel(groups) {
 
 /** 文档头部用的「对话日期」一行：有逐条时间给区间，手动归档给日期，都没有就明确写未知 + 导入日期。 */
 export function conversationDateLabel(conversation, groups) {
+  if (conversation.options && conversation.options.showTime === false) return '未保存时间信息';
   if (conversation.timeSource === 'message') return dateRangeLabel(groups);
   if (conversation.timeSource === 'day' && conversation.fallbackDate) return conversation.fallbackDate;
   return `未知（导入日期 ${dateKey(Date.now(), conversation.timeZone)}）`;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI 对话识别存档 · DeepSeek / ChatGPT / Claude</title>
+<title>AI 对话识别存档 · DeepSeek</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -21,10 +21,17 @@
   <section id="view-home" class="view home-view">
     <div class="hero-card">
       <h1>AI 对话，直接变文档</h1>
-      <p class="sub">粘贴 DeepSeek / ChatGPT / Claude 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档，自动进入存档。</p>
+      <p class="sub">粘贴 DeepSeek 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档，自动进入存档。也可在下方勾选删掉思考过程等不想保留的内容，或把对话转成其他 AI 应用能直接用的对话稿。</p>
       <div class="input-row">
         <input id="url" type="text" placeholder="https://chat.deepseek.com/share/…" autocomplete="off" spellcheck="false">
         <button id="go" class="btn primary" type="button">识别存档</button>
+      </div>
+      <div class="gen-opts" id="gen-opts">
+        <span class="gen-opts-title">生成选项（对链接和粘贴都生效）：</span>
+        <label class="opt-check"><input type="checkbox" id="opt-strip-thinking"> 只留正文（删思考过程等）</label>
+        <label class="opt-check"><input type="checkbox" id="opt-show-title" checked> 保存标题</label>
+        <label class="opt-check"><input type="checkbox" id="opt-show-link" checked> 保存原始链接</label>
+        <label class="opt-check"><input type="checkbox" id="opt-show-time" checked> 保存时间信息</label>
       </div>
       <div class="opts-row">
         <label class="opt">时区 <select id="tz" class="tz"></select></label>
@@ -38,7 +45,7 @@
           <select id="tz-paste" class="tz"></select>
           <button id="go-paste" class="btn primary" type="button">识别存档</button>
         </div>
-        <p class="paste-hint">认不出角色时整段成文；想分角色，在每段前加一行「用户：」「DeepSeek：」「ChatGPT：」「Claude：」。</p>
+        <p class="paste-hint">认不出角色时整段成文；想分角色，在每段前加一行「用户：」「DeepSeek：」。</p>
       </div>
       <div id="status" class="status hidden"></div>
     </div>
@@ -63,6 +70,8 @@
         <button id="toggle-md" class="btn" type="button">查看 Markdown</button>
         <a id="dl-html" class="btn primary" download>下载 HTML</a>
         <a id="dl-md" class="btn" download>下载 Markdown</a>
+        <button id="copy-transcript" class="btn" type="button">复制 AI 对话稿</button>
+        <a id="dl-transcript" class="btn" download>下载对话稿</a>
       </div>
     </div>
     <div class="result-body">

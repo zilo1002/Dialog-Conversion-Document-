@@ -136,13 +136,14 @@ footer.doc-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var
 
 export function renderHtmlDocument(conversation, groups) {
   const totalMessages = conversation.messages.length;
+  const showTime = !(conversation.options && conversation.options.showTime === false);
   const metaBits = [];
   metaBits.push(`<span>来源：${escapeHtml(conversation.sourceLabel || '未知来源')}</span>`);
-  metaBits.push(`<span>对话日期：${escapeHtml(conversationDateLabel(conversation, groups))}</span>`);
+  if (showTime) metaBits.push(`<span>对话日期：${escapeHtml(conversationDateLabel(conversation, groups))}</span>`);
   if (conversation.sourceUrl) {
     metaBits.push(`<span>原始链接：<a href="${escapeHtml(conversation.sourceUrl)}" rel="noreferrer">${escapeHtml(conversation.sourceUrl)}</a></span>`);
   }
-  metaBits.push(`<span>消息 ${totalMessages} 条 · ${groups.length} 个日期</span>`);
+  metaBits.push(`<span>消息 ${totalMessages} 条${showTime ? ` · ${groups.length} 个日期` : ''}</span>`);
   if (conversation.modelLabel) metaBits.push(`<span>模型 ${escapeHtml(conversation.modelLabel)}</span>`);
   metaBits.push(`<span>时区 ${escapeHtml(conversation.timeZone)}</span>`);
   metaBits.push(`<span>导出 ${escapeHtml(dateTimeLabel(conversation.fetchedAt, conversation.timeZone))}</span>`);

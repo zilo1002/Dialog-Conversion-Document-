@@ -52,9 +52,8 @@ async function fetchHtml(url, referer) {
 }
 
 /**
- * 统一入口：按平台抓分享数据。
- * - deepseek：走公开接口 GET /api/v0/share/content?share_id=<id>（实测见 README）
- * - chatgpt / claude：抓分享页 HTML，正文内嵌在 __NEXT_DATA__ 里（见各解析器注释）
+ * 统一入口：抓 DeepSeek 分享数据。
+ * 走公开接口 GET /api/v0/share/content?share_id=<id>（实测见 README）。
  */
 export async function fetchShare(rawInput) {
   const { platform, shareId, canonicalUrl } = parseShareInput(rawInput);
@@ -96,8 +95,7 @@ export async function fetchShare(rawInput) {
     return { platform, kind: 'api', shareId, canonicalUrl, raw: bizData };
   }
 
-  const html = await fetchHtml(canonicalUrl, canonicalUrl);
-  return { platform, kind: 'html', shareId, canonicalUrl, html };
+  return { platform, kind: 'api', shareId, canonicalUrl };
 }
 
 export async function fetchShareShellHtml(canonicalUrl) {

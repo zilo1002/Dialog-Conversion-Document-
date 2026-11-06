@@ -2,8 +2,6 @@ const ID_RE = /^[A-Za-z0-9_-]{6,80}$/;
 
 const PLATFORMS = [
   { id: 'deepseek', label: 'DeepSeek', hosts: ['chat.deepseek.com', 'deepseek.com'] },
-  { id: 'chatgpt', label: 'ChatGPT', hosts: ['chatgpt.com', 'chat.openai.com', 'openai.com'] },
-  { id: 'claude', label: 'Claude', hosts: ['claude.ai', 'claude.com', 'anthropic.com'] },
 ];
 
 function platformForHost(hostname) {
@@ -40,7 +38,7 @@ export function parseShareInput(raw) {
     platform = platformForHost(u.hostname);
     if (!platform) {
       const err = new Error(
-        `暂不支持「${u.hostname}」的分享链接，目前支持 DeepSeek（chat.deepseek.com）、ChatGPT（chatgpt.com）、Claude（claude.ai）。`,
+        `暂不支持「${u.hostname}」的分享链接，目前只支持 DeepSeek（chat.deepseek.com）的分享链接。`,
       );
       err.code = 'UNSUPPORTED_SITE';
       throw err;
