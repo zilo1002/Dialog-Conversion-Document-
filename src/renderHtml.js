@@ -1,6 +1,7 @@
 import { markdownToHtml } from './markdown.js';
 import { dateTimeLabel } from './localtime.js';
 import { conversationDateLabel } from './groupByDate.js';
+import { DOC_STYLES } from './convert.js';
 
 const ROLE_LABEL = { user: '用户', assistant: 'DeepSeek', system: '系统', unknown: '未标注角色' };
 
@@ -134,8 +135,51 @@ footer.doc-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var
 }
 `;
 
+const THEMES = `
+/* —— 排版风格：body class 切换，经典文档风是默认基准 —— */
+/* 简洁纯文本风：去卡片、去阴影，贴近原始文字 */
+body.doc-plain { background: var(--paper); }
+body.doc-plain .wrap { max-width: 760px; padding: 28px 16px 64px; }
+body.doc-plain h1.doc-title { font-size: 24px; }
+body.doc-plain .note, body.doc-plain .warnings { background: transparent; border: 0; border-radius: 0; padding: 0; }
+body.doc-plain .note { border-left: 3px solid var(--line); padding-left: 12px; }
+body.doc-plain .day-head { position: static; background: transparent; backdrop-filter: none; }
+body.doc-plain article.msg, body.doc-plain article.msg.user {
+  background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 6px 0 10px;
+  border-bottom: 1px dashed var(--line); border-radius: 0;
+}
+body.doc-plain .msg-head { margin-bottom: 4px; }
+body.doc-plain details.thinking, body.doc-plain aside.label-block { background: transparent; }
+body.doc-plain .code-block { border-radius: 6px; }
+/* 聊天气泡风：问答左右分侧，圆角气泡 */
+body.doc-bubbles .wrap { max-width: 680px; }
+body.doc-bubbles section.day { display: flex; flex-direction: column; }
+body.doc-bubbles .day-head {
+  position: static; background: transparent; backdrop-filter: none; border-bottom: 0;
+  justify-content: center; gap: 8px; margin-bottom: 16px;
+}
+body.doc-bubbles .day-head h2 {
+  font-size: 13px; font-weight: 500; color: var(--ink-soft);
+  background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 4px 14px;
+}
+body.doc-bubbles article.msg {
+  border: 0; box-shadow: none; background: var(--paper); border: 1px solid var(--line);
+  padding: 12px 16px; margin: 0 0 14px; max-width: 88%;
+  border-radius: 18px; border-bottom-left-radius: 6px; align-self: flex-start;
+}
+body.doc-bubbles article.msg.user {
+  margin-left: auto; margin-right: 0; background: var(--accent-soft); border-color: transparent;
+  border-radius: 18px; border-bottom-right-radius: 6px; align-self: flex-end;
+}
+body.doc-bubbles .msg-head { font-size: 12px; margin-bottom: 6px; }
+body.doc-bubbles article.msg.user .msg-head { justify-content: flex-end; }
+body.doc-bubbles details.thinking { background: transparent; }
+`;
+
 export function renderHtmlDocument(conversation, groups) {
   const totalMessages = conversation.messages.length;
+  const style = conversation.options && conversation.options.docStyle;
+  const docStyle = DOC_STYLES.includes(style) ? style : 'classic';
   const showTime = !(conversation.options && conversation.options.showTime === false);
   const metaBits = [];
   metaBits.push(`<span>来源：${escapeHtml(conversation.sourceLabel || '未知来源')}</span>`);
@@ -178,9 +222,9 @@ ${items}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(conversation.title)} · DeepSeek 对话存档</title>
-<style>${STYLE}</style>
+<style>${STYLE}${THEMES}</style>
 </head>
-<body>
+<body class="doc-${docStyle}">
 <div class="wrap">
 <header class="doc-head">
   <h1 class="doc-title">${escapeHtml(conversation.title)}</h1>

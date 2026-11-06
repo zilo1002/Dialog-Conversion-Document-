@@ -59,7 +59,8 @@ test('选项 stripThinking：只留正文问答，思考过程与联网搜索片
 
 test('选项默认值：不勾选任何删除项时行为与旧版一致（思考过程保留）', () => {
   const conv = applyConversationOptions(parseSharePayload(realSample(), meta), undefined);
-  assert.deepEqual(normalizeOptions(undefined), { stripThinking: false, showTitle: true, showLink: true, showTime: true });
+  assert.deepEqual(normalizeOptions(undefined), { stripThinking: false, showTitle: true,
+    docStyle: 'classic', showLink: true, showTime: true });
   assert.ok(conv.messages.some((m) => m.parts.some((p) => p.type === 'thinking')));
 });
 

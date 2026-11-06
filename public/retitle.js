@@ -33,3 +33,18 @@ export function applyTitle(entry, rawTitle) {
   // 顶层 title 也同步：结果页标题等显示字段读的是顶层
   return { ...entry, title, summary: { ...(entry.summary || {}), title, filenames }, html, markdown, transcript, plaintext };
 }
+
+// 排版风格：与 src/convert.js 的 DOC_STYLES 保持一致（classic 经典文档 / plain 简洁纯文本 / bubbles 聊天气泡）
+const DOC_STYLES = ['classic', 'plain', 'bubbles'];
+
+/** 切换排版：改 html 的 body class（三套主题 CSS 都在文档里）并同步 options / summary.options，正文不动。 */
+export function applyDocStyle(entry, style) {
+  if (!entry || !DOC_STYLES.includes(style) || !entry.html) return entry;
+  const old = (entry.options && entry.options.docStyle) || (entry.summary && entry.summary.options && entry.summary.options.docStyle) || 'classic';
+  if (style === old) return entry;
+  if (!/<body class="doc-(classic|plain|bubbles)"/.test(entry.html)) return entry;
+  const html = entry.html.replace(/<body class="doc-(classic|plain|bubbles)"/, `<body class="doc-${style}"`);
+  const options = { ...(entry.options || {}), docStyle: style };
+  const summary = { ...(entry.summary || {}), options: { ...((entry.summary && entry.summary.options) || {}), docStyle: style } };
+  return { ...entry, options, summary, html };
+}

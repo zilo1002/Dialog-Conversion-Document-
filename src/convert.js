@@ -11,7 +11,8 @@ import { safeFileBase } from './filenames.js';
 import { safeTimeZone } from './localtime.js';
 
 /** 生成选项：用户决定文档与存档里保留哪些信息（界面上的四个勾选）。 */
-export const DEFAULT_OPTIONS = { stripThinking: false, showTitle: true, showLink: true, showTime: true };
+export const DOC_STYLES = ['classic', 'plain', 'bubbles'];
+export const DEFAULT_OPTIONS = { stripThinking: false, showTitle: true, showLink: true, showTime: true, docStyle: 'classic' };
 
 export function normalizeOptions(raw) {
   const o = raw && typeof raw === 'object' ? raw : {};
@@ -20,6 +21,7 @@ export function normalizeOptions(raw) {
     showTitle: o.showTitle !== false,
     showLink: o.showLink !== false,
     showTime: o.showTime !== false,
+    docStyle: DOC_STYLES.includes(o.docStyle) ? o.docStyle : 'classic',
   };
 }
 

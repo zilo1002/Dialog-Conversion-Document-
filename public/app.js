@@ -1,5 +1,6 @@
 import { localDateString } from '/localdate.js';
-import { applyTitle } from '/retitle.js';
+import { applyTitle, applyDocStyle } from '/retitle.js';
+import { mergedHtml, mergedMarkdown } from '/batchExport.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -124,6 +125,7 @@ function readOptions() {
     showTitle: $('#opt-show-title').checked,
     showLink: $('#opt-show-link').checked,
     showTime: $('#opt-show-time').checked,
+    docStyle: (document.querySelector('input[name="docstyle"]:checked') || {}).value || 'classic',
   };
 }
 
@@ -169,7 +171,13 @@ function openResult(data) {
   $('#md-view').classList.add('hidden');
   $('#preview').classList.remove('hidden');
   $('#toggle-md').textContent = '查看 Markdown';
+  renderStyleRow();
   showView('result');
+}
+
+function renderStyleRow() {
+  const st = (current && current.options && current.options.docStyle) || 'classic';
+  $$('#style-row [data-style]').forEach((b) => b.classList.toggle('active', b.dataset.style === st));
 }
 
 async function copyText(text, okMsg) {
@@ -231,6 +239,7 @@ function cardFor(item) {
       <span class="chip">${escapeHtml(dateText)}</span>
     </div>
     <div class="card-actions">
+      <label class="card-sel"><input type="checkbox" data-sel ${selIds.has(item.id) ? 'checked' : ''}> 多选</label>
       <button class="btn" data-act="view" type="button">查看</button>
       <button class="btn" data-act="dl-html" type="button">HTML</button>
       <button class="btn" data-act="dl-md" type="button">Markdown</button>
@@ -271,6 +280,10 @@ function cardFor(item) {
       if (e.key === 'Escape') cancel();
     });
   });
+  el.querySelector('[data-sel]').addEventListener('change', (e) => {
+    if (e.target.checked) selIds.add(item.id); else selIds.delete(item.id);
+    updateBatchBar();
+  });
   const delBtn = el.querySelector('[data-act="del"]');
   delBtn.addEventListener('click', async () => {
     if (delBtn.dataset.confirm !== '1') {
@@ -290,6 +303,36 @@ function renderList(container, items) {
   container.replaceChildren(...items.map(cardFor));
 }
 
+// —— 多选与合并导出：全部走本机存档数据，不需要管理密钥 ——
+const selIds = new Set();
+let archiveItems = [];
+
+function updateBatchBar() {
+  const total = archiveItems.length;
+  $('#batch-bar').classList.toggle('hidden', total === 0);
+  $('#sel-count').textContent = total === 0 ? '' : selIds.size ? `已选 ${selIds.size} / 共 ${total} 篇` : `共 ${total} 篇，勾选后可合并导出`;
+  $('#sel-all').checked = total > 0 && selIds.size === total;
+  $('#exp-html').disabled = $('#exp-md').disabled = selIds.size === 0;
+}
+
+async function doBatchExport(kind) {
+  const items = archiveItems.filter((e) => selIds.has(e.id));
+  if (!items.length) return;
+  const name = `DeepSeek对话合订本_${localDateString(new Date())}_${items.length}篇`;
+  if (kind === 'html') downloadBlob(`${name}.html`, mergedHtml(items) || '', 'text/html; charset=utf-8');
+  else downloadBlob(`${name}.md`, mergedMarkdown(items) || '', 'text/markdown; charset=utf-8');
+  toast(`已导出 ${items.length} 篇合订本（本机生成，包含所选内容）`);
+}
+
+$('#sel-all').addEventListener('change', (e) => {
+  selIds.clear();
+  if (e.target.checked) archiveItems.forEach((it) => selIds.add(it.id));
+  renderList($('#archive-list'), archiveItems);
+  updateBatchBar();
+});
+$('#exp-html').addEventListener('click', () => doBatchExport('html'));
+$('#exp-md').addEventListener('click', () => doBatchExport('md'));
+
 async function refreshArchive() {
   const items = await localArchiveAll();
   const badge = $('#archive-count');
@@ -297,7 +340,11 @@ async function refreshArchive() {
   badge.classList.toggle('hidden', items.length === 0);
   $('#archive-count2').textContent = items.length ? `${items.length} 份文档（保存在本机）` : '';
   $('#archive-empty').classList.toggle('hidden', items.length > 0);
+  const ids = new Set(items.map((it) => it.id));
+  for (const id of [...selIds]) if (!ids.has(id)) selIds.delete(id);
+  archiveItems = items;
   renderList($('#archive-list'), items);
+  updateBatchBar();
   $('#recent').classList.toggle('hidden', items.length === 0);
   renderList($('#recent-list'), items.slice(0, 3));
 }
@@ -339,7 +386,19 @@ $('#copy-share').addEventListener('click', () => {
   copyText($('#share-link').textContent, '分享链接已复制，发给 AI 或任何人都能直接打开');
 });
 
-$('#toggle-md').addEventListener('click', () => {
+  $$('#style-row [data-style]').forEach((b) => b.addEventListener('click', async () => {
+    if (!current) return;
+    const updated = applyDocStyle(current, b.dataset.style);
+    if (updated === current) return;
+    current = updated;
+    const pv = $('#preview');
+    pv.removeAttribute('src');
+    pv.srcdoc = updated.html || '';
+    await localArchivePut(updated);
+    renderStyleRow();
+    toast('排版已切换，本机存档同步更新');
+  }));
+  $('#toggle-md').addEventListener('click', () => {
   const showingMd = !$('#md-view').classList.contains('hidden');
   $('#md-view').classList.toggle('hidden', showingMd);
   $('#preview').classList.toggle('hidden', !showingMd);
