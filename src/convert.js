@@ -6,7 +6,7 @@ import { parsePastedText } from './paste.js';
 import { groupByDate, dateRangeLabel } from './groupByDate.js';
 import { renderHtmlDocument } from './renderHtml.js';
 import { renderMarkdown } from './renderMarkdown.js';
-import { renderTranscript } from './renderTranscript.js';
+import { renderTranscript, renderPlainText } from './renderTranscript.js';
 import { safeFileBase } from './filenames.js';
 import { safeTimeZone } from './localtime.js';
 
@@ -56,11 +56,56 @@ export function applyConversationOptions(conversation, rawOptions) {
   return conversation;
 }
 
+const SHARE_ROLE_LABEL = { user: '用户', assistant: 'DeepSeek', system: '系统', unknown: '对话' };
+
+/**
+ * /share/<id>.json 的结构化数据：元信息 + 逐条消息。
+ * content 是正文（只含问答），parts 保留全部分片（含思考过程，type 标明），时间跟随生成选项。
+ */
+export function sharePayload(built) {
+  const c = built.conversation;
+  const noTime = c.options && c.options.showTime === false;
+  return {
+    title: c.title,
+    platform: c.platform,
+    sourceLabel: c.sourceLabel || null,
+    sourceUrl: c.sourceUrl || null,
+    timeZone: c.timeZone,
+    timeSource: noTime ? 'hidden' : c.timeSource,
+    timeNote: c.timeNote,
+    messageCount: c.messages.length,
+    days: noTime ? [] : built.groups.map((g) => ({ key: g.key, label: g.label, count: g.messages.length })),
+    options: c.options || { ...DEFAULT_OPTIONS },
+    warnings: c.warnings,
+    exportedAt: new Date(c.fetchedAt).toISOString(),
+    // 时间标签在分组时才落到消息上，从分组结果取
+    messages: built.groups.flatMap((g) => g.messages).map((m) => ({
+      index: m.index ?? null,
+      role: m.role,
+      roleLabel: SHARE_ROLE_LABEL[m.role] || m.role,
+      time: noTime ? null : m.timeLabel || null,
+      content: m.parts
+        .filter((p) => p.type === 'request' || p.type === 'response')
+        .map((p) => String(p.content || '').trim())
+        .filter(Boolean)
+        .join('\n\n'),
+      parts: m.parts.map((p) => ({
+        type: p.type,
+        label: p.label || null,
+        content: String(p.content || ''),
+        ...(Number.isFinite(p.elapsed) ? { elapsedSecs: Math.round(p.elapsed) } : {}),
+      })),
+    })),
+  };
+}
+
 export function buildResult(conversation) {
   const groups = groupByDate(conversation);
   const html = renderHtmlDocument(conversation, groups);
   const markdown = renderMarkdown(conversation, groups);
   const transcript = renderTranscript(conversation, groups);
+  const plaintext = renderPlainText(conversation, groups);
+  const share = sharePayload({ conversation, groups });
   const noTime = conversation.options && conversation.options.showTime === false;
   const base = safeFileBase(conversation.title, noTime ? 'no-date' : dateRangeLabel(groups));
   return {
@@ -69,6 +114,8 @@ export function buildResult(conversation) {
     html,
     markdown,
     transcript,
+    plaintext,
+    share,
     filenames: { html: `${base}.html`, markdown: `${base}.md`, transcript: `${base}_对话稿.md` },
   };
 }

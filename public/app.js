@@ -63,9 +63,31 @@ function chipsFor(data) {
   return chips.join('');
 }
 
+async function copyText(text, okMsg) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast(okMsg);
+    return true;
+  } catch (err) {
+    toast(`复制失败：${err.message}`);
+    return false;
+  }
+}
+
 function openResult(data) {
   current = data;
-  $('#r-title').textContent = data.title || '未命名文档';
+  const shareUrl = data.shareUrl || `${location.origin}/share/${data.id}`;
+  $('#share-link').href = shareUrl;
+  $('#share-link').textContent = shareUrl;
   $('#r-meta').innerHTML = chipsFor(data);
   $('#dl-html').href = `/api/result/${data.id}/download?format=html`;
   $('#dl-html').setAttribute('download', (data.filenames && data.filenames.html) || 'document.html');
@@ -122,9 +144,11 @@ function cardFor(item) {
       <a class="btn" href="/api/result/${item.id}/download?format=html" download>HTML</a>
       <a class="btn" href="/api/result/${item.id}/download?format=md" download>Markdown</a>
       <a class="btn" href="/api/result/${item.id}/download?format=transcript" download>对话稿</a>
+      <button class="btn" data-act="sharelink" type="button">复制链接</button>
       <button class="btn danger" data-act="del" type="button">删除</button>
     </div>`;
   el.querySelector('[data-act="view"]').addEventListener('click', () => openResult({ id: item.id, ...s }));
+  el.querySelector('[data-act="sharelink"]').addEventListener('click', () => copyText(`${location.origin}/share/${item.id}`, '分享链接已复制'));
   const delBtn = el.querySelector('[data-act="del"]');
   delBtn.addEventListener('click', async () => {
     if (delBtn.dataset.confirm !== '1') {
@@ -196,25 +220,19 @@ $('#toggle-paste').addEventListener('click', () => {
 $('#back').addEventListener('click', () => showView('home'));
 
 $('#copy-transcript').addEventListener('click', async () => {
-  const btn = $('#copy-transcript');
   if (!current) return;
   try {
     const res = await fetch(`/api/result/${current.id}/transcript`);
     const text = await res.text();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-    toast('对话稿已复制，可直接粘贴给其他 AI 应用');
+    await copyText(text, '对话稿已复制，可直接粘贴给其他 AI 应用');
   } catch (err) {
     toast(`复制失败：${err.message}，可点「下载对话稿」`);
   }
+});
+
+$('#copy-share').addEventListener('click', () => {
+  if (!current) return;
+  copyText($('#share-link').textContent, '分享链接已复制，发给 AI 或任何人都能直接打开');
 });
 
 $('#toggle-md').addEventListener('click', async () => {

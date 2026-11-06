@@ -10,21 +10,41 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const MAX_BODY = 12 * 1024 * 1024;
 
 const app = express();
+// Render 等平台在反向代理后面：信任 X-Forwarded-*，req.protocol 才是公网的 https
+app.set('trust proxy', 1);
 app.use(express.json({ limit: MAX_BODY }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 识别过的文档持久化到 data/（重启不丢；Render 免费实例磁盘重置除外）
 const archive = new Archive(DATA_DIR);
 
-async function respondConverted(res, built) {
+// 分享链接按「BASE_URL 环境变量优先，否则取本次请求的协议 + 域名」生成，
+// 部署到 Render 后自动是 https://xxx.onrender.com/share/<id>，不会指向 localhost
+function absoluteShareUrl(req, id) {
+  // Render 在反代后面：优先 X-Forwarded-Host / X-Forwarded-Proto，本机直连时回退 Host（含端口）
+  const host = req.get('x-forwarded-host') || req.get('host') || req.hostname;
+  const proto = req.get('x-forwarded-proto') || req.protocol;
+  const base = String(process.env.BASE_URL || `${proto}://${host}`).replace(/\/+$/, '');
+  return `${base}/share/${id}`;
+}
+
+async function respondConverted(req, res, built) {
   const summary = summarize(built);
-  const entry = await archive.save({ summary, html: built.html, markdown: built.markdown, transcript: built.transcript });
+  const entry = await archive.save({
+    summary,
+    html: built.html,
+    markdown: built.markdown,
+    transcript: built.transcript,
+    plaintext: built.plaintext,
+    share: built.share,
+  });
   res.json({
     ok: true,
     id: entry.id,
     createdAt: entry.createdAt,
     ...summary,
     previewUrl: `/api/result/${entry.id}/preview`,
+    shareUrl: absoluteShareUrl(req, entry.id),
     download: {
       html: `/api/result/${entry.id}/download?format=html`,
       markdown: `/api/result/${entry.id}/download?format=md`,
@@ -55,7 +75,7 @@ function statusFor(err) {
 app.post('/api/convert', async (req, res) => {
   try {
     const { url, tz, options } = req.body || {};
-    await respondConverted(res, await convertUrl(url, tz, options));
+    await respondConverted(req, res, await convertUrl(url, tz, options));
   } catch (err) {
     res.status(statusFor(err)).json({ ok: false, code: err.code || 'UNKNOWN', message: err.message || '抓取失败', fallback: true });
   }
@@ -64,7 +84,7 @@ app.post('/api/convert', async (req, res) => {
 app.post('/api/convert/paste', async (req, res) => {
   try {
     const { text, title, date, tz, options } = req.body || {};
-    await respondConverted(res, convertPaste({ text, title, date, tz, options }));
+    await respondConverted(req, res, convertPaste({ text, title, date, tz, options }));
   } catch (err) {
     res.status(statusFor(err)).json({ ok: false, code: err.code || 'UNKNOWN', message: err.message || '转换失败' });
   }
@@ -125,6 +145,30 @@ app.get('/api/result/:id/download', async (req, res) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, node: process.version }));
+
+// —— 公开分享出口：一个内容 ID，多格式返回同一份内容 ——
+// 主入口 /share/<id> 是服务端直接返回的完整 HTML（正文全在页面里，不依赖 JS）；
+// .md / .txt / .json 是同一份内容的其他格式表示，不是独立文件。
+function shareFormat(rawId) {
+  const m = String(rawId || '').match(/^(.+)\.(md|txt|json)$/i);
+  return m ? { id: m[1], format: m[2].toLowerCase() } : { id: String(rawId || ''), format: 'html' };
+}
+
+app.get('/share/:id', async (req, res) => {
+  const { id, format } = shareFormat(req.params.id);
+  const entry = await archive.get(id);
+  if (!entry) {
+    const msg = '分享不存在或已被删除。';
+    if (format === 'json') return res.status(404).json({ error: msg });
+    return res.status(404).type('text; charset=utf-8').send(msg);
+  }
+  if (format === 'md') return res.type('text/markdown; charset=utf-8').send(entry.transcript || '');
+  if (format === 'txt') return res.type('text/plain; charset=utf-8').send(entry.plaintext || '');
+  if (format === 'json') {
+    return res.json({ id: entry.id, createdAt: entry.createdAt, ...(entry.share || {}) });
+  }
+  res.type('text/html; charset=utf-8').send(entry.html);
+});
 
 app.listen(PORT, () => {
   console.log(`deepseek-to-doc 已启动：http://localhost:${PORT}`);

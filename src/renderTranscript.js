@@ -39,3 +39,26 @@ export function renderTranscript(conversation, groups) {
   lines.push('');
   return lines.join('\n');
 }
+
+/** 纯文本出口（/share/<id>.txt）：同一份内容，【角色】行 + 正文，无 Markdown 语法。 */
+export function renderPlainText(conversation, groups) {
+  const showTime = !(conversation.options && conversation.options.showTime === false);
+  const lines = [];
+  lines.push(`DeepSeek 对话记录：${conversation.title}`);
+  if (showTime) lines.push(`时间：${conversationDateLabel(conversation, groups)}`);
+  if (conversation.sourceUrl) lines.push(`原始链接：${conversation.sourceUrl}`);
+  lines.push('');
+  for (const group of groups) {
+    for (const msg of group.messages) {
+      const stamp = showTime && msg.timeLabel ? `（${msg.timeLabel}）` : '';
+      lines.push(`【${ROLE_LABEL[msg.role] || msg.role}】${stamp}`);
+      for (const part of msg.parts) {
+        if (part.type !== 'request' && part.type !== 'response') continue;
+        const body = String(part.content || '').trim();
+        if (body) lines.push(body, '');
+      }
+    }
+  }
+  lines.push(`共 ${conversation.messages.length} 条消息，由 deepseek-to-doc 导出。`);
+  return lines.join('\n');
+}
