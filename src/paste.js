@@ -16,6 +16,7 @@ const CHROME_LINES = [
 const USER_MARK = /^\s*(?:\*\*)?\s*[\[【]?\s*(用户|提问者|我|user|human|you)\s*(?:\s+(?:said|says|说))?\s*[\]】]?\s*(?:\*\*)?\s*[:：]\s*(.*)$/i;
 const AI_MARK = /^\s*(?:\*\*)?\s*[\[【]?\s*(deepseek|assistant|ai|助手|模型|回答)\s*(?:\s+(?:said|says|说))?\s*[\]】]?\s*(?:\*\*)?\s*[:：]\s*(.*)$/i;
 const THINK_MARK = /^\s*(?:thought for\s+[\d.]+\s*(?:seconds?|secs?|s)|已?思考[（(]?用时\s*[\d.]+\s*秒[)）]?|思考了\s*[\d.]+\s*秒|深度思考)\s*$/i;
+const FENCE_RE = /^\s*(```|~~~)/;
 
 function isChrome(line) {
   const t = line.trim();
@@ -62,9 +63,12 @@ export function parsePastedText(rawText, options = {}) {
 
   const userHits = [];
   const aiHits = [];
-  lines.forEach((line, i) => {
-    if (USER_MARK.test(line)) userHits.push(i);
-    if (AI_MARK.test(line)) aiHits.push(i);
+  let fence = false;
+  lines.forEach((line) => {
+    if (FENCE_RE.test(line)) fence = !fence;
+    if (fence) return; // 代码块/引用示例里的「用户：」「DeepSeek：」不是消息边界
+    if (USER_MARK.test(line)) userHits.push(line);
+    if (AI_MARK.test(line)) aiHits.push(line);
   });
   const markerCount = userHits.length + aiHits.length;
 
@@ -73,27 +77,45 @@ export function parsePastedText(rawText, options = {}) {
   if (markerCount >= 2) {
     let role = null;
     let buffer = [];
+    let preamble = [];
     const flush = () => {
       if (role) pushMessage(messages, role, buffer.join('\n'));
       buffer = [];
     };
+    const flushPreamble = () => {
+      // 第一条角色标记之前的文字（开场白等）不丢，作为一条未标注角色的记录放在最前
+      if (preamble.length) {
+        pushMessage(messages, 'unknown', preamble.join('\n'));
+        preamble = [];
+      }
+    };
+    fence = false;
     for (const line of lines) {
-      const u = line.match(USER_MARK);
-      const a = u ? null : line.match(AI_MARK);
-      if (u) {
-        flush();
-        role = 'user';
-        if (u[2]) buffer.push(u[2]);
+      if (FENCE_RE.test(line)) {
+        fence = !fence;
+        if (role) buffer.push(line);
+        else preamble.push(line);
         continue;
       }
-      if (a) {
+      if (fence) {
+        if (role) buffer.push(line);
+        else preamble.push(line);
+        continue;
+      }
+      const u = line.match(USER_MARK);
+      const a = u ? null : line.match(AI_MARK);
+      if (u || a) {
+        flushPreamble();
         flush();
-        role = 'assistant';
-        if (a[2]) buffer.push(a[2]);
+        role = u ? 'user' : 'assistant';
+        const m = u || a;
+        if (m[2]) buffer.push(m[2]);
         continue;
       }
       if (role) buffer.push(line);
+      else preamble.push(line);
     }
+    flushPreamble();
     flush();
     warnings.push('按角色标记（用户 / DeepSeek）切分了消息。');
   } else {

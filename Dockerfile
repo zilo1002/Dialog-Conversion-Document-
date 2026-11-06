@@ -1,5 +1,5 @@
 # 国内可直连的自有 VPS / Zeabur 一键运行用
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 

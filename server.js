@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertUrl, convertPaste, summarize } from './src/convert.js';
@@ -15,8 +16,28 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: MAX_BODY }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 识别过的文档持久化到 data/（重启不丢；Render 免费实例磁盘重置除外）
+// 识别过的文档持久化到 data/（公开分享出口 /share/<id> 需要它）；
+// Render 免费实例磁盘重置会丢，备份与持久化见 README。
 const archive = new Archive(DATA_DIR);
+
+// —— 存档管理保护：列表 / 预览 / 下载 / 删除 / 备份导出需要 ADMIN_KEY，
+// 未设置时这些接口直接关闭，任何访客都动不了存档。公开分享 /share/<id> 不在此列。——
+const ADMIN_KEY = String(process.env.ADMIN_KEY || '');
+
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
+
+function adminGuard(req, res) {
+  if (ADMIN_KEY && safeEqual(req.get('x-admin-key') || req.query.key || '', ADMIN_KEY)) return true;
+  const msg = ADMIN_KEY
+    ? '需要管理员密钥：请求头 x-admin-key 或查询参数 ?key= 传入部署时设置的 ADMIN_KEY'
+    : '服务端存档管理接口未启用：部署时设置 ADMIN_KEY 环境变量后才能访问（存档列表/预览/删除/备份）';
+  res.status(403).json({ ok: false, message: msg });
+  return false;
+}
 
 // 分享链接按「BASE_URL 环境变量优先，否则取本次请求的协议 + 域名」生成，
 // 部署到 Render 后自动是 https://xxx.onrender.com/share/<id>，不会指向 localhost
@@ -43,13 +64,12 @@ async function respondConverted(req, res, built) {
     id: entry.id,
     createdAt: entry.createdAt,
     ...summary,
-    previewUrl: `/api/result/${entry.id}/preview`,
     shareUrl: absoluteShareUrl(req, entry.id),
-    download: {
-      html: `/api/result/${entry.id}/download?format=html`,
-      markdown: `/api/result/${entry.id}/download?format=md`,
-      transcript: `/api/result/${entry.id}/download?format=transcript`,
-    },
+    // 完整记录随响应回给浏览器：存档进 IndexedDB（本机），页面不再依赖服务端读取接口
+    html: built.html,
+    markdown: built.markdown,
+    transcript: built.transcript,
+    plaintext: built.plaintext,
   });
 }
 
@@ -90,7 +110,8 @@ app.post('/api/convert/paste', async (req, res) => {
   }
 });
 
-app.get('/api/archive', async (_req, res) => {
+app.get('/api/archive', async (req, res) => {
+  if (!adminGuard(req, res)) return;
   try {
     res.json({ ok: true, items: await archive.list() });
   } catch {
@@ -99,11 +120,13 @@ app.get('/api/archive', async (_req, res) => {
 });
 
 app.delete('/api/result/:id', async (req, res) => {
+  if (!adminGuard(req, res)) return;
   const ok = await archive.remove(req.params.id);
   res.status(ok ? 200 : 404).json({ ok });
 });
 
 async function loadEntry(req, res) {
+  if (!adminGuard(req, res)) return null;
   const entry = await archive.get(req.params.id);
   if (!entry) {
     res.status(404).json({ ok: false, message: '存档不存在或已删除' });
@@ -111,6 +134,16 @@ async function loadEntry(req, res) {
   }
   return entry;
 }
+
+// 备份导出：data/ 里全部存档打包成一个 JSON（管理员密钥保护），Render 免费实例重置前的救命出口
+app.get('/api/backup', async (req, res) => {
+  if (!adminGuard(req, res)) return;
+  const entries = await archive.exportAll();
+  const body = JSON.stringify({ exportedAt: new Date().toISOString(), count: entries.length, entries }, null, 0);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', "attachment; filename=\"deepseek-to-doc-backup.json\"; filename*=UTF-8''deepseek-to-doc-backup.json");
+  res.send(body);
+});
 
 app.get('/api/result/:id/preview', async (req, res) => {
   const entry = await loadEntry(req, res);

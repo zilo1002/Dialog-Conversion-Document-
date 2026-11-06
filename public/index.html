@@ -21,7 +21,7 @@
   <section id="view-home" class="view home-view">
     <div class="hero-card">
       <h1>AI 对话，直接变文档</h1>
-      <p class="sub">粘贴 DeepSeek 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档，自动进入存档。也可在下方勾选删掉思考过程等不想保留的内容，或把对话转成其他 AI 应用能直接用的对话稿。</p>
+      <p class="sub">粘贴 DeepSeek 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档。文档存档保存在这台设备的浏览器里（IndexedDB），不上传服务器；也可勾选删掉思考过程等不想保留的内容，或转成其他 AI 应用能直接用的对话稿和公开分享链接。</p>
       <div class="input-row">
         <input id="url" type="text" placeholder="https://chat.deepseek.com/share/…" autocomplete="off" spellcheck="false">
         <button id="go" class="btn primary" type="button">识别存档</button>
@@ -68,10 +68,10 @@
       </div>
       <div class="result-actions">
         <button id="toggle-md" class="btn" type="button">查看 Markdown</button>
-        <a id="dl-html" class="btn primary" download>下载 HTML</a>
-        <a id="dl-md" class="btn" download>下载 Markdown</a>
+        <button id="dl-html" class="btn primary" type="button">下载 HTML</button>
+        <button id="dl-md" class="btn" type="button">下载 Markdown</button>
         <button id="copy-transcript" class="btn" type="button">复制 AI 对话稿</button>
-        <a id="dl-transcript" class="btn" download>下载对话稿</a>
+        <button id="dl-transcript" class="btn" type="button">下载对话稿</button>
       </div>
     </div>
     <div class="share-row" id="share-row">
@@ -90,12 +90,13 @@
       <h2>存档</h2>
       <span id="archive-count2" class="muted"></span>
     </div>
+    <p class="muted" style="font-size:12px;margin:0 0 14px;">存档保存在本设备浏览器的 IndexedDB 里，不上传服务器；删除只删本机，公开分享链接在服务端仍有效（清理方法见 README）。换设备或清除浏览器数据会丢，重要内容请先下载。</p>
     <div id="archive-list" class="cards"></div>
-    <p id="archive-empty" class="empty hidden">还没有存档。回到「识别」，粘一条分享链接试试。</p>
+    <p id="archive-empty" class="empty hidden">本机还没有存档。回到「识别」，粘一条分享链接试试。</p>
   </section>
 </main>
 
 <div id="toast" class="toast hidden"></div>
-<script src="/app.js"></script>
+<script src="/app.js" type="module"></script>
 </body>
 </html>

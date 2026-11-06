@@ -1,3 +1,5 @@
+import { localDateString } from '/localdate.js';
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -14,7 +16,78 @@ for (const sel of ['#tz', '#tz-paste']) {
 }
 
 let current = null;
-let archiveItems = [];
+
+// —— 本机存档：存在这台设备的浏览器里（IndexedDB），不上传服务器 ——
+// 不可用时退化为内存（页面关掉就没，会提示）
+const DB_NAME = 'd2d-archive';
+const STORE = 'entries';
+let memoryArchive = [];
+let idbOk = typeof indexedDB !== 'undefined';
+let idbWarned = false;
+
+function idbReq(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function withStore(mode, fn) {
+  if (!idbOk) throw new Error('no-idb');
+  const db = await idbReq(indexedDB.open(DB_NAME, 1)).catch((err) => { throw err; });
+  const tx = db.transaction(STORE, mode);
+  const result = await fn(tx.objectStore(STORE), tx);
+  tx.oncomplete = () => {};
+  return result;
+}
+async function localArchiveAll() {
+  if (!idbOk) return [...memoryArchive].sort((a, b) => b.createdAt - a.createdAt);
+  try {
+    const db = await idbReq(indexedDB.open(DB_NAME, 1));
+    if (!db.objectStoreNames.contains(STORE)) return [];
+    const tx = db.transaction(STORE, 'readonly');
+    const items = await idbReq(tx.objectStore(STORE).getAll());
+    return (items || []).sort((a, b) => b.createdAt - a.createdAt);
+  } catch {
+    idbOk = false;
+    warnIdb();
+    return [...memoryArchive].sort((a, b) => b.createdAt - a.createdAt);
+  }
+}
+async function localArchivePut(entry) {
+  if (!idbOk) {
+    memoryArchive = [entry, ...memoryArchive.filter((e) => e.id !== entry.id)];
+    return;
+  }
+  try {
+    const db = await idbReq(indexedDB.open(DB_NAME, 1));
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(entry);
+  } catch {
+    idbOk = false;
+    warnIdb();
+    memoryArchive = [entry, ...memoryArchive.filter((e) => e.id !== entry.id)];
+  }
+}
+async function localArchiveDelete(id) {
+  if (!idbOk) {
+    memoryArchive = memoryArchive.filter((e) => e.id !== id);
+    return;
+  }
+  try {
+    const db = await idbReq(indexedDB.open(DB_NAME, 1));
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+  } catch {
+    idbOk = false;
+    warnIdb();
+    memoryArchive = memoryArchive.filter((e) => e.id !== id);
+  }
+}
+function warnIdb() {
+  if (idbWarned) return;
+  idbWarned = true;
+  toast('浏览器存档不可用，本次存档只保留在当前页面内存里，关页就丢');
+}
 
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -63,6 +136,34 @@ function chipsFor(data) {
   return chips.join('');
 }
 
+function downloadBlob(name, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function shareLinkOf(entry) {
+  return entry.shareUrl || `${location.origin}/share/${entry.id}`;
+}
+
+function openResult(data) {
+  current = data;
+  $('#r-title').textContent = data.title || '未命名文档';
+  $('#r-meta').innerHTML = chipsFor(data);
+  $('#share-link').href = shareLinkOf(data);
+  $('#share-link').textContent = shareLinkOf(data);
+  $('#preview').srcdoc = data.html || '';
+  $('#md-view').textContent = data.markdown || '';
+  $('#md-view').classList.add('hidden');
+  $('#preview').classList.remove('hidden');
+  $('#toggle-md').textContent = '查看 Markdown';
+  showView('result');
+}
+
 async function copyText(text, okMsg) {
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -83,25 +184,6 @@ async function copyText(text, okMsg) {
   }
 }
 
-function openResult(data) {
-  current = data;
-  const shareUrl = data.shareUrl || `${location.origin}/share/${data.id}`;
-  $('#share-link').href = shareUrl;
-  $('#share-link').textContent = shareUrl;
-  $('#r-meta').innerHTML = chipsFor(data);
-  $('#dl-html').href = `/api/result/${data.id}/download?format=html`;
-  $('#dl-html').setAttribute('download', (data.filenames && data.filenames.html) || 'document.html');
-  $('#dl-md').href = `/api/result/${data.id}/download?format=md`;
-  $('#dl-md').setAttribute('download', (data.filenames && data.filenames.markdown) || 'document.md');
-  $('#dl-transcript').href = `/api/result/${data.id}/download?format=transcript`;
-  $('#dl-transcript').setAttribute('download', (data.filenames && data.filenames.transcript) || 'transcript.md');
-  $('#preview').src = `/api/result/${data.id}/preview`;
-  $('#md-view').classList.add('hidden');
-  $('#preview').classList.remove('hidden');
-  $('#toggle-md').textContent = '查看 Markdown';
-  showView('result');
-}
-
 async function convert(path, body, btn) {
   clearStatus();
   btn.classList.add('is-loading');
@@ -115,8 +197,9 @@ async function convert(path, body, btn) {
       return;
     }
     clearStatus();
+    await localArchivePut(data);
     openResult(data);
-    toast('已生成并加入存档');
+    toast('已生成，文档保存在本机浏览器里');
     refreshArchive();
   } catch (err) {
     setStatus('error', `网络错误：${err.message}。请确认服务可访问。`);
@@ -141,14 +224,17 @@ function cardFor(item) {
     </div>
     <div class="card-actions">
       <button class="btn" data-act="view" type="button">查看</button>
-      <a class="btn" href="/api/result/${item.id}/download?format=html" download>HTML</a>
-      <a class="btn" href="/api/result/${item.id}/download?format=md" download>Markdown</a>
-      <a class="btn" href="/api/result/${item.id}/download?format=transcript" download>对话稿</a>
+      <button class="btn" data-act="dl-html" type="button">HTML</button>
+      <button class="btn" data-act="dl-md" type="button">Markdown</button>
+      <button class="btn" data-act="dl-tr" type="button">对话稿</button>
       <button class="btn" data-act="sharelink" type="button">复制链接</button>
       <button class="btn danger" data-act="del" type="button">删除</button>
     </div>`;
-  el.querySelector('[data-act="view"]').addEventListener('click', () => openResult({ id: item.id, ...s }));
-  el.querySelector('[data-act="sharelink"]').addEventListener('click', () => copyText(`${location.origin}/share/${item.id}`, '分享链接已复制'));
+  el.querySelector('[data-act="view"]').addEventListener('click', () => openResult(item));
+  el.querySelector('[data-act="dl-html"]').addEventListener('click', () => downloadBlob((s.filenames && s.filenames.html) || 'document.html', item.html || '', 'text/html; charset=utf-8'));
+  el.querySelector('[data-act="dl-md"]').addEventListener('click', () => downloadBlob((s.filenames && s.filenames.markdown) || 'document.md', item.markdown || '', 'text/markdown; charset=utf-8'));
+  el.querySelector('[data-act="dl-tr"]').addEventListener('click', () => downloadBlob((s.filenames && s.filenames.transcript) || 'transcript.md', item.transcript || '', 'text/markdown; charset=utf-8'));
+  el.querySelector('[data-act="sharelink"]').addEventListener('click', () => copyText(shareLinkOf(item), '分享链接已复制（服务端公开出口）'));
   const delBtn = el.querySelector('[data-act="del"]');
   delBtn.addEventListener('click', async () => {
     if (delBtn.dataset.confirm !== '1') {
@@ -157,14 +243,9 @@ function cardFor(item) {
       setTimeout(() => { delBtn.dataset.confirm = ''; delBtn.textContent = '删除'; }, 2600);
       return;
     }
-    try {
-      const res = await fetch(`/api/result/${item.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast('已删除');
-      refreshArchive();
-    } catch (err) {
-      toast(`删除失败：${err.message}`);
-    }
+    await localArchiveDelete(item.id);
+    toast('已从本机删除；公开分享链接仍在服务端有效，清理方法见 README');
+    refreshArchive();
   });
   return el;
 }
@@ -174,26 +255,19 @@ function renderList(container, items) {
 }
 
 async function refreshArchive() {
-  try {
-    const res = await fetch('/api/archive');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) return;
-    archiveItems = data.items || [];
-    const badge = $('#archive-count');
-    badge.textContent = String(archiveItems.length);
-    badge.classList.toggle('hidden', archiveItems.length === 0);
-    $('#archive-count2').textContent = archiveItems.length ? `${archiveItems.length} 份文档` : '';
-    $('#archive-empty').classList.toggle('hidden', archiveItems.length > 0);
-    renderList($('#archive-list'), archiveItems);
-    $('#recent').classList.toggle('hidden', archiveItems.length === 0);
-    renderList($('#recent-list'), archiveItems.slice(0, 3));
-  } catch {
-    /* 首次加载失败先不提示，识别成功后会再刷新 */
-  }
+  const items = await localArchiveAll();
+  const badge = $('#archive-count');
+  badge.textContent = String(items.length);
+  badge.classList.toggle('hidden', items.length === 0);
+  $('#archive-count2').textContent = items.length ? `${items.length} 份文档（保存在本机）` : '';
+  $('#archive-empty').classList.toggle('hidden', items.length > 0);
+  renderList($('#archive-list'), items);
+  $('#recent').classList.toggle('hidden', items.length === 0);
+  renderList($('#recent-list'), items.slice(0, 3));
 }
 
-// 时区下拉默认北京时间，粘贴日期默认今天
-$('#paste-date').value = new Date().toISOString().slice(0, 10);
+// 粘贴日期默认今天：按浏览器本机时区算，不用 UTC（否则会差一天）
+$('#paste-date').value = localDateString();
 
 $('#go').addEventListener('click', () => {
   const url = $('#url').value.trim();
@@ -219,15 +293,9 @@ $('#toggle-paste').addEventListener('click', () => {
 
 $('#back').addEventListener('click', () => showView('home'));
 
-$('#copy-transcript').addEventListener('click', async () => {
+$('#copy-transcript').addEventListener('click', () => {
   if (!current) return;
-  try {
-    const res = await fetch(`/api/result/${current.id}/transcript`);
-    const text = await res.text();
-    await copyText(text, '对话稿已复制，可直接粘贴给其他 AI 应用');
-  } catch (err) {
-    toast(`复制失败：${err.message}，可点「下载对话稿」`);
-  }
+  copyText(current.transcript || '', '对话稿已复制，可直接粘贴给其他 AI 应用');
 });
 
 $('#copy-share').addEventListener('click', () => {
@@ -235,21 +303,11 @@ $('#copy-share').addEventListener('click', () => {
   copyText($('#share-link').textContent, '分享链接已复制，发给 AI 或任何人都能直接打开');
 });
 
-$('#toggle-md').addEventListener('click', async () => {
+$('#toggle-md').addEventListener('click', () => {
   const showingMd = !$('#md-view').classList.contains('hidden');
   $('#md-view').classList.toggle('hidden', showingMd);
   $('#preview').classList.toggle('hidden', !showingMd);
   $('#toggle-md').textContent = showingMd ? '查看 Markdown' : '查看排版';
-  if (!showingMd && !$('#md-view').textContent) {
-    try {
-      $('#md-view').textContent = '加载中…';
-      const res = await fetch(`/api/result/${current.id}/markdown`);
-      const t = await res.text();
-      $('#md-view').textContent = t.length > 30000 ? `${t.slice(0, 30000)}\n\n…（下载后可看完整内容）` : t;
-    } catch {
-      $('#md-view').textContent = '（Markdown 加载失败，可直接点下载）';
-    }
-  }
 });
 
 document.addEventListener('click', (e) => {

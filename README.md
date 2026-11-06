@@ -19,10 +19,10 @@ npm start
 
 然后打开 http://localhost:5178 ，把分享链接粘进去，点「生成文档」。
 
-- Node 版本：18.17 以上（用到内置 `fetch`；开发验证用的是 Node 24）
+- Node 版本：20.18.1 以上（依赖 cheerio 1.1+ 与其内置的 undici 要求这个下限；开发验证用的是 Node 24，Render 默认 Node 22 也满足。package.json 的 engines 已按此声明，Dockerfile 用 node:22-alpine）
 - 端口：默认 5178，可用 `PORT=8080 npm start` 改
 - 依赖：`express`（本地服务）、`cheerio`（HTML 兜底解析）、`marked`（Markdown 渲染）
-- 测试：`npm test`（31 个用例）
+- 测试：`npm test`（46 个用例）
 - 存档目录：默认项目下的 `data/`（每个文档一个 JSON，含元信息和两种文档内容），可用环境变量 `DATA_DIR` 改；`data/` 不进 git
 
 ## 支持的平台（实测结论 2026-11）
@@ -43,7 +43,8 @@ npm start
 
 - 首屏：一个完整窗口，中间是链接输入框和「识别存档」按钮；没有链接时展开「粘贴全文」也能成文。两种方式共用下面这排「生成选项」勾选。
 - 识别后进入结果页：排版预览（文档本身按日期分节、逐条带时间）、元信息（来源、日期、消息数、时间说明）、下载 HTML / 下载 Markdown、复制 AI 对话稿 / 下载对话稿，可切换看 Markdown 原文；页面上还有可点击的公开分享链接（`/share/<id>`）和「复制链接」按钮，存档卡片也有「复制链接」。
-- 存档页：识别过的文档都在，卡片列出标题、来源、日期、条数，每张卡可查看、重新下载（HTML / Markdown / 对话稿三个按钮，可下多次）、删除（点两次确认）。首屏下方同时显示最近 3 条。
+- 存档页：识别过的文档保存在这台设备浏览器的 IndexedDB 里（不上传服务器），卡片列出标题、来源、日期、条数，每张卡可查看、重新下载（HTML / Markdown / 对话稿，全部从本机生成下载，可下多次）、复制分享链接、删除（点两次确认）。首屏下方同时显示最近 3 条。
+- 隐私边界：访客打开网页看不到任何别人的存档——存档列表只在本机浏览器里；服务端的管理接口（列表、预览、下载、删除、备份导出）默认全部关闭，部署时设置 `ADMIN_KEY` 环境变量后才可用，且调用必须带密钥（请求头 `x-admin-key` 或 `?key=`）。公开分享出口 `/share/<id>` 单独保留（见上一节），这是唯一公开读内容的方式。
 - 移动端可用：窄屏下输入框和按钮自动竖排，卡片单列。
 
 ## 生成选项（保留什么、删掉什么）
@@ -147,12 +148,27 @@ GET https://chat.deepseek.com/api/v0/share/content?share_id=<id>
    - 直接粘贴分享页全选复制的内容：按 `Thought for N seconds`、`已思考（用时 N 秒）` 这类行切分问答
    - 什么标记都没有：整段作为一条「未标注角色」的记录，照样出文档，并提示加标记的方法
 
+## 存档保存在哪：本机优先
+
+2026-11-06 起存档默认本地化：
+
+- 浏览器（你的手机 / 电脑）：IndexedDB 存完整文档（HTML / Markdown / 对话稿 / 结构化数据）。存档列表、预览、下载、删除都直接读本机，换浏览器、换设备或清除浏览器数据会丢，重要内容请点卡片上的下载按钮留底。
+- 服务端 `data/`：识别时仍会存一份，唯一用途是让公开分享出口 `/share/<id>` 能被外部 AI 应用读取。访客通过界面看不到它（界面读的是浏览器），管理接口需要 `ADMIN_KEY`。
+- 取舍说明：本机删除某条存档，只删浏览器里的记录，服务端的公开分享内容仍在（分享链接继续有效）。要彻底清理服务端内容，见下面的备份与清理。生成时的「保存标题 / 原始链接 / 时间信息 / 只留正文」选项同样决定服务端那份里有什么。
+
+### 备份、清理与持久化
+
+- 备份导出：设置 `ADMIN_KEY=你的密钥` 部署后，`curl -H "x-admin-key: 你的密钥" https://你的域名/api/backup -o backup.json` 一次导出 `data/` 里全部存档。建议在 Render 免费实例每次重启前先导。
+- 清理服务端单条：`curl -X DELETE -H "x-admin-key: 你的密钥" https://你的域名/api/result/<id>`。
+- Render 持久磁盘：付费档挂磁盘后把应用根目录设为挂载点，`data/` 重启不丢；免费档磁盘随重启重置，靠上面的导出备份。
+- Docker / VPS：`docker run -v $(pwd)/data:/app/data ...` 把 `data/` 挂到宿主机，重启不丢。
+
 ## 已知限制
 
 - 接口不是官方公开 API，DeepSeek 随时可能改字段或加风控；改了就靠上面的兜底路径。
 - 分享接口返回的标题常常只是通用占位（实测 DeepSeek 就是 `Shared Conversation`），这时文档标题取首条提问前 28 个字，并在文档里标注。
 - 拿不到逐条时间戳时，文档会明确写「对话日期未知（导入日期 今天）」，不编造时间。
-- 存档是写在本机/实例的 `data/` 目录里的。Render、Railway 免费实例的磁盘会随重启或重新部署重置，存档会丢；要长期保留，要么挂平台的持久磁盘，要么用自有服务器部署并把 `data/` 备份下来。
+- 存档分两处：浏览器 IndexedDB（随清除浏览器数据/换设备丢失）和服务端 `data/`（Render、Railway 免费实例磁盘随重启重置）。应对见「存档保存在哪：本机优先」一节的备份导出与持久磁盘方案。
 - 只解析单条分享链接里的对话；需要登录才能看的对话抓不到。
 - 分享链接是公开的：拿到 `/share/<id>` 的人无需登录就能读到该份对话全文；注意别把敏感对话的链接发到公开场合。
 - 分享页里的「下载 / 复制」按钮文字属于页面装饰，复制全文时已自动去掉；但页面结构变了可能残留个别行，可在粘贴框里手动删。
@@ -190,7 +206,7 @@ git push -u origin main
 
 Railway：New Project → Deploy from GitHub repo 选这个仓库，自动识别 Node 服务，Start Command 用 `npm start`；PORT 由平台注入。
 
-Docker 自建：仓库带 Dockerfile（node:20-alpine，`npm install --omit=dev && npm start`，端口读 PORT）。
+Docker 自建：仓库带 Dockerfile（node:22-alpine，`npm install --omit=dev && npm start`，端口读 PORT）。
 
 ```bash
 docker build -t deepseek-to-doc .
@@ -198,7 +214,7 @@ docker run -d --name deepseek-to-doc -e PORT=8080 -p 8080:8080 --restart unless-
 # 浏览器打开 http://<服务器IP>:8080
 ```
 
-不想用 Docker，装好 Node 20+ 后 `npm install && npm start` 也一样能跑；要存档不丢就把 `data/` 挂到持久盘或备份。
+不想用 Docker，装好 Node 20.18.1+ 后 `npm install && npm start` 也一样能跑；要存档不丢就把 `data/` 挂到持久盘或备份。
 
 ## 目录结构
 
@@ -206,12 +222,12 @@ docker run -d --name deepseek-to-doc -e PORT=8080 -p 8080:8080 --restart unless-
 deepseek-to-doc/
 ├── .gitignore            # 忽略 node_modules / 日志 / .env / data
 ├── render.yaml           # Render Blueprint（一键部署）
-├── data/                 # 运行时生成的存档（不进 git）
+├── data/                 # 运行时生成的公开分享内容（不进 git；界面存档在浏览器 IndexedDB）
 ├── src/
 │   ├── convert.js        # 识别转换入口（三平台分发 + 粘贴）
 │   ├── archive.js        # data/ 目录持久化存档
 ├── .dockerignore           # Docker 构建时排除的内容
-├── Dockerfile              # node:20-alpine，VPS / Zeabur 用
+├── Dockerfile              # node:22-alpine，VPS / Zeabur 用
 ├── LICENSE                # MIT
 ├── server.js              # Express 服务：代理抓取、生成、预览、下载
 ├── src/

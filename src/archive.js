@@ -29,6 +29,26 @@ export class Archive {
     return entry;
   }
 
+  /** 备份导出：读出 data/ 里全部存档记录。 */
+  async exportAll() {
+    await this.init();
+    let names = [];
+    try {
+      names = (await fs.readdir(this.dir)).filter((n) => n.endsWith('.json')).sort();
+    } catch {
+      return [];
+    }
+    const out = [];
+    for (const n of names) {
+      try {
+        out.push(JSON.parse(await fs.readFile(path.join(this.dir, n), 'utf8')));
+      } catch {
+        /* 跳过损坏的记录 */
+      }
+    }
+    return out;
+  }
+
   async get(id) {
     if (!ID_RE.test(String(id || ''))) return null;
     try {
