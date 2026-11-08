@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertUrl, convertPaste, summarize } from './src/convert.js';
 import { Archive } from './src/archive.js';
+import { createRevocationToken, hashRevocationToken, matchesRevocationToken } from './src/revocation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 5178);
@@ -25,8 +26,8 @@ app.use(
 // Render 免费实例磁盘重置会丢，备份与持久化见 README。
 const archive = new Archive(DATA_DIR);
 
-// —— 存档管理保护：列表 / 预览 / 下载 / 删除 / 备份导出需要 ADMIN_KEY，
-// 未设置时这些接口直接关闭，任何访客都动不了存档。公开分享 /share/<id> 不在此列。——
+// —— 管理员存档接口：列表 / 预览 / 下载 / 管理员删除 / 备份导出需要 ADMIN_KEY。
+// 单条分享另可由创建者浏览器的专属撤销令牌撤销；公开分享 /share/<id> 无需登录。——
 const ADMIN_KEY = String(process.env.ADMIN_KEY || '');
 
 function safeEqual(a, b) {
@@ -55,8 +56,12 @@ function absoluteShareUrl(req, id) {
 }
 
 async function respondConverted(req, res, built) {
+  // 响应含撤销凭据与对话正文，不让浏览器或中间缓存留存。
+  res.setHeader('Cache-Control', 'no-store');
   const summary = summarize(built);
+  const revokeToken = createRevocationToken();
   const entry = await archive.save({
+    revokeTokenHash: hashRevocationToken(revokeToken),
     summary,
     html: built.html,
     markdown: built.markdown,
@@ -71,6 +76,8 @@ async function respondConverted(req, res, built) {
     summary,
     ...summary,
     shareUrl: absoluteShareUrl(req, entry.id),
+    // 原始令牌仅交给生成此记录的浏览器；服务器只保存其 SHA-256 哈希
+    revokeToken,
     // 完整记录随响应回给浏览器：存档进 IndexedDB（本机），页面不再依赖服务端读取接口
     html: built.html,
     markdown: built.markdown,
@@ -129,6 +136,20 @@ app.delete('/api/result/:id', async (req, res) => {
   if (!adminGuard(req, res)) return;
   const ok = await archive.remove(req.params.id);
   res.status(ok ? 200 : 404).json({ ok });
+});
+
+// 由生成该分享的浏览器凭专属 bearer token 撤销公开内容。令牌只放请求体，避免进入 URL 日志。
+// 对已不存在的记录返回成功，便于安全重试；不泄露 ID 是否曾经存在。
+app.delete('/api/share/:id', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const entry = await archive.get(req.params.id);
+  if (!entry) return res.status(204).end();
+  if (!matchesRevocationToken(req.body?.token, entry.revokeTokenHash)) {
+    return res.status(403).json({ ok: false, message: '无法验证这条分享的撤销凭据' });
+  }
+  const removed = await archive.remove(req.params.id);
+  if (!removed) return res.status(500).json({ ok: false, message: '服务端删除失败，请稍后重试' });
+  return res.status(204).end();
 });
 
 async function loadEntry(req, res) {
@@ -194,6 +215,8 @@ function shareFormat(rawId) {
 }
 
 app.get('/share/:id', async (req, res) => {
+  // 分享内容可公开访问，但不应被浏览器/CDN长期缓存，以便撤销后及时失效。
+  res.setHeader('Cache-Control', 'no-store');
   const { id, format } = shareFormat(req.params.id);
   const entry = await archive.get(id);
   if (!entry) {

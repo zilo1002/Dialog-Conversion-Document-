@@ -21,7 +21,7 @@
   <section id="view-home" class="view home-view">
     <div class="hero-card">
       <h1>AI 对话，直接变文档</h1>
-      <p class="sub">粘贴 DeepSeek 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档。文档存档保存在这台设备的浏览器里（IndexedDB），不上传服务器；也可勾选删掉思考过程等不想保留的内容，或转成其他 AI 应用能直接用的对话稿和公开分享链接。</p>
+      <p class="sub">粘贴 DeepSeek 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档。本机文档副本保存在浏览器（IndexedDB）；为提供公开分享链接，生成的完整内容也会发送并保存在本站服务端。可勾选删掉思考过程等内容；删除新存档时会同时关闭对应分享链接。</p>
       <div class="input-row">
         <input id="url" type="text" placeholder="https://chat.deepseek.com/share/…" autocomplete="off" spellcheck="false">
         <button id="go" class="btn primary" type="button">识别存档</button>
@@ -100,7 +100,7 @@
       <h2>存档</h2>
       <span id="archive-count2" class="muted"></span>
     </div>
-    <p class="muted" style="font-size:12px;margin:0 0 14px;">存档保存在本设备浏览器的 IndexedDB 里，不上传服务器；删除只删本机，公开分享链接在服务端仍有效（清理方法见 README）。换设备或清除浏览器数据会丢，重要内容请先下载。</p>
+    <p class="muted" style="font-size:12px;margin:0 0 14px;">本机文档副本保存在 IndexedDB；公开分享内容另存于服务端。删除新存档会同时关闭分享链接；旧存档若没有撤销凭据，按钮会注明仅删本机副本。换设备或清除浏览器数据会丢本机副本和撤销凭据，重要内容请先下载。</p>
     <div id="batch-bar" class="batch-bar hidden">
       <label class="opt-check"><input type="checkbox" id="sel-all"> 全选</label>
       <span id="sel-count" class="muted">未选择</span>

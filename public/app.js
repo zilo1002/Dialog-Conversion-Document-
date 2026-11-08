@@ -19,7 +19,7 @@ for (const sel of ['#tz', '#tz-paste']) {
 
 let current = null;
 
-// —— 本机存档：存在这台设备的浏览器里（IndexedDB），不上传服务器 ——
+// —— 本机存档：文档副本存在这台设备的浏览器里（IndexedDB） ——
 // 不可用时退化为内存（页面关掉就没，会提示）
 const DB_NAME = 'd2d-archive';
 const STORE = 'entries';
@@ -215,7 +215,7 @@ async function convert(path, body, btn) {
     clearStatus();
     await localArchivePut(data);
     openResult(data);
-    toast('已生成，文档保存在本机浏览器里');
+    toast('已生成：本机保存一份，公开分享副本在服务端');
     refreshArchive();
   } catch (err) {
     setStatus('error', `网络错误：${err.message}。请确认服务可访问。`);
@@ -246,7 +246,7 @@ function cardFor(item) {
       <button class="btn" data-act="dl-tr" type="button">对话稿</button>
       <button class="btn" data-act="rename" type="button">重命名</button>
       <button class="btn" data-act="sharelink" type="button">复制链接</button>
-      <button class="btn danger" data-act="del" type="button">删除</button>
+      <button class="btn danger" data-act="del" type="button">${item.revokeToken ? '删除并关闭分享' : '仅本机删除'}</button>
     </div>`;
   el.querySelector('[data-act="view"]').addEventListener('click', () => openResult(item));
   el.querySelector('[data-act="dl-html"]').addEventListener('click', () => downloadBlob((s.filenames && s.filenames.html) || 'document.html', item.html || '', 'text/html; charset=utf-8'));
@@ -285,15 +285,39 @@ function cardFor(item) {
     updateBatchBar();
   });
   const delBtn = el.querySelector('[data-act="del"]');
+  const defaultDeleteLabel = item.revokeToken ? '删除并关闭分享' : '仅本机删除';
   delBtn.addEventListener('click', async () => {
     if (delBtn.dataset.confirm !== '1') {
       delBtn.dataset.confirm = '1';
-      delBtn.textContent = '确认删除？';
-      setTimeout(() => { delBtn.dataset.confirm = ''; delBtn.textContent = '删除'; }, 2600);
+      delBtn.textContent = item.revokeToken ? '确认删除并关闭？' : '确认仅本机删除？';
+      setTimeout(() => { delBtn.dataset.confirm = ''; delBtn.textContent = defaultDeleteLabel; }, 2600);
       return;
     }
-    await localArchiveDelete(item.id);
-    toast('已从本机删除；公开分享链接仍在服务端有效，清理方法见 README');
+    delBtn.disabled = true;
+    if (item.revokeToken) {
+      try {
+        const res = await fetch(`/api/share/${encodeURIComponent(item.id)}`, {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token: item.revokeToken }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || `请求失败（HTTP ${res.status}）`);
+        }
+        await localArchiveDelete(item.id);
+        toast('本机存档已删除，公开分享链接已关闭');
+      } catch (err) {
+        delBtn.disabled = false;
+        delBtn.dataset.confirm = '';
+        delBtn.textContent = defaultDeleteLabel;
+        toast(`关闭分享失败，存档仍保留：${err.message}`);
+        return;
+      }
+    } else {
+      await localArchiveDelete(item.id);
+      toast('本机副本已删除；这条旧分享仍在服务端公开，需用 ADMIN_KEY 清理');
+    }
     refreshArchive();
   });
   return el;
