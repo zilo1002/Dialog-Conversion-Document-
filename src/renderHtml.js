@@ -98,6 +98,8 @@ article.msg.user { background: var(--accent-soft); border-color: transparent; }
 .role { font-weight: 600; letter-spacing: .02em; }
 article.msg.user .role { color: var(--accent); }
 .time { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.md { overflow-wrap: break-word; }
+.md img { max-width: 100%; height: auto; }
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
 .md p { margin: 0 0 12px; }
@@ -123,6 +125,15 @@ details.thinking[open] > summary { margin-bottom: 10px; }
 aside.label-block { margin: 0 0 14px; padding: 10px 14px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent-soft) 60%, transparent); border-radius: 0 10px 10px 0; }
 .label-block-title { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
 footer.doc-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); }
+@media (max-width: 640px) {
+  .wrap { padding: 24px 14px 56px; }
+  h1.doc-title { font-size: 23px; }
+  .meta { font-size: 12px; }
+  .day-head h2 { font-size: 16px; }
+  article.msg { padding: 14px 15px; }
+  body.doc-bubbles article.msg { max-width: 100%; }
+  .md table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
 @media print {
   :root { --bg: #fff; --paper: #fff; --ink: #000; --ink-soft: #444; --line: #ddd; }
   body { background: #fff; }

@@ -8,7 +8,7 @@
 
 打开网页就是完整界面：中间一个输入框，粘贴 DeepSeek 分享链接点「识别存档」，直接生成按日期排版的 HTML 与 Markdown 文档并自动存档，历史文档可反复下载、可删除。生成前可以勾选删掉思考过程、标题、原始链接、时间信息中的任何一项；生成结果里还包括一份给其他 AI 应用直接用的「AI 对话稿」。
 
-部署一次就好：把仓库推到 GitHub，点上面的按钮在 Render 部署，拿到固定网址就能一直用，本地不需要装任何东西（详见「部署」一节）。想在本地跑，按下面的「快速开始」。
+部署一次就好：前端在 GitHub Pages（https://zilo1002.github.io/Dialog-Conversion-Document-/），后端在 Cloudflare Worker（https://deepseek-to-doc.liuziyi2333.workers.dev），推到 GitHub 就能用，本地不需要装任何东西（详见「部署」一节）。想在本地跑，按下面的「快速开始」。
 
 ## 快速开始
 
@@ -80,7 +80,7 @@ npm start
 | `/share/<id>.txt` | 纯文本版：【用户】/【DeepSeek】角色行 + 正文 |
 | `/share/<id>.json` | 结构化数据：元信息 + 逐条消息（角色、时间、分片类型，含思考过程原文） |
 
-ChatGPT、Claude、Kimi、Grok 这类具备网页读取能力的 AI 应用，把 `/share/<id>` 链接发给它们即可读取。链接按请求域名自动生成（部署到 Render 后就是 `https://xxx.onrender.com/share/<id>`），也可用 `BASE_URL` 环境变量固定域名。结果页显示可点击的分享链接和「复制链接」按钮，存档卡片同样有「复制链接」。
+ChatGPT、Claude、Kimi、Grok 这类具备网页读取能力的 AI 应用，把 `/share/<id>` 链接发给它们即可读取。链接按请求域名自动生成（线上是 `https://deepseek-to-doc.liuziyi2333.workers.dev/share/<id>`），也可用 `BASE_URL` 环境变量固定域名。结果页显示可点击的分享链接和「复制链接」按钮，存档卡片同样有「复制链接」。
 
 如实说明：各应用是否真的会去抓、能读到什么，取决于各自版本与配置（比如是否开启浏览 / 联网功能）。链接本身是公开 https、服务端返回、不依赖 JS，符合网页读取条件，但不保证所有 AI 应用都会读取；Hark、Muse、Wabi、Today 需逐个实测后才能确认，本项目不替它们背书。
 
@@ -158,7 +158,7 @@ HTML 文档内置三种排版风格，body 上的 `doc-classic` / `doc-plain` / 
 2026-11-06 起存档默认本地化：
 
 - 浏览器（你的手机 / 电脑）：IndexedDB 保存完整文档和每条新分享的撤销令牌。本机存档列表、预览、下载与合订导出从这份副本读取。换浏览器、换设备或清除浏览器数据会丢失副本与撤销令牌；重要内容请下载备份。
-- 服务端 `data/`：每次识别或粘贴生成时，服务端都会保存完整生成结果，用于公开分享出口 `/share/<id>`。这不是纯本机处理；访问公开分享链接无需登录。管理列表、预览、下载与备份接口需要 `ADMIN_KEY`。
+- 服务端：每次识别或粘贴生成时，服务端都会保存完整生成结果，用于公开分享出口 `/share/<id>`。这不是纯本机处理；访问公开分享链接无需登录。线上后端（Cloudflare Worker）存在 KV 命名空间里，重启不丢；本地 / Render 部署时存在 `data/` 目录。管理列表、预览、下载与备份接口需要 `ADMIN_KEY`（Worker 上未启用）。
 - 删除行为：新生成记录的「删除并关闭分享」会把专属撤销令牌发给服务端，服务端只保存其哈希；凭据通过后删除服务端记录并清掉本机副本，因此该分享的 HTML、Markdown、文本和 JSON 出口都失效。无撤销令牌的旧记录，按钮只删本机副本，服务端链接仍有效；旧记录可由管理员用下方接口清理。清除浏览器数据后也会失去撤销令牌。删除不会收回别人先前复制或下载的内容。生成选项决定保存内容包含哪些标题、原始链接、时间信息与思考过程。
 
 ### 备份、清理与持久化
@@ -173,7 +173,7 @@ HTML 文档内置三种排版风格，body 上的 `doc-classic` / `doc-plain` / 
 - 接口不是官方公开 API，DeepSeek 随时可能改字段或加风控；改了就靠上面的兜底路径。
 - 分享接口返回的标题常常只是通用占位（实测 DeepSeek 就是 `Shared Conversation`），这时文档标题取首条提问前 28 个字，并在文档里标注。
 - 拿不到逐条时间戳时，文档会明确写「对话日期未知（导入日期 今天）」，不编造时间。
-- 服务端 `data/` 会保存用于公开分享的完整记录；Render、Railway 免费实例磁盘随重启重置，可能使分享和管理员存档一并丢失。浏览器 IndexedDB 另存本机副本及新分享撤销凭据；清除浏览器数据会失去这些本机数据。应对见「存档保存在哪：本机优先」一节。
+- 服务端会保存用于公开分享的完整记录（线上是 Cloudflare KV，重启不丢；本地/单体是 `data/`，Render、Railway 免费实例磁盘随重启重置，可能使分享和管理员存档一并丢失）。浏览器 IndexedDB 另存本机副本及新分享撤销凭据；清除浏览器数据会失去这些本机数据。应对见「存档保存在哪：本机优先」一节。
 - 撤销只删除本站服务端记录；不能撤回别人已复制、下载或另行保存的内容。旧记录或遗失撤销凭据的记录，需管理员凭 `ADMIN_KEY` 清理。
 - 只解析单条分享链接里的对话；需要登录才能看的对话抓不到。
 - 分享链接是公开的：拿到 `/share/<id>` 的人无需登录就能读到该份对话全文；注意别把敏感对话的链接发到公开场合。
@@ -200,19 +200,20 @@ git push -u origin main
 
 ## 部署
 
-推荐路径不需要本地装任何东西：GitHub 推送 → Render 页面点一次 → 拿到固定网址。构建命令 `npm install`、启动命令 `npm start`、健康检查 `/api/health`（render.yaml 已配好）；端口代码里读 `process.env.PORT`（本地没设时默认 5178），平台注入的 PORT 自动生效。
+线上部署分两块：前端是 GitHub Pages 上的静态页面，后端是 Cloudflare Worker。
 
-1. 把仓库推到 GitHub（见上一节的命令）。
-2. 打开 https://render.com/deploy?repo=https://github.com/zilo1002/Dialog-Conversion-Document-（README 顶部有同一个按钮），登录后点 Apply / Create Web Service，等一两分钟。仓库名不同的话，把链接里的仓库名换成你的。
-3. 拿到固定网址（形如 `https://deepseek-to-doc.onrender.com`），打开就是完整界面，手机浏览器也能用。
+- 前端：推到 GitHub 后，在仓库 Settings → Pages 里选「Deploy from a branch」，分支 main、文件夹 /（根目录），保存后几分钟生效，地址是 `https://zilo1002.github.io/Dialog-Conversion-Document-/`。仓库根目录的 `index.html` 是 Pages 入口，加载 `public/` 里的页面文件；`public/config.js` 里写着后端地址。
+- 后端：Cloudflare Worker `deepseek-to-doc`，地址 `https://deepseek-to-doc.liuziyi2333.workers.dev`，存档存在 KV 命名空间 `dialog-archive` 里（重启不丢）。重新部署：`npm run build:worker` 打包，再用 Cloudflare API 把产物推上去，改完 `backend/worker.js` 都要重新打包部署。Worker 上管理接口（存档列表/备份）未启用，只留转换、分享与撤销。
 
-免费实例限制：15 分钟无人访问会休眠，首次访问要等几秒；实例磁盘随重启/重新部署重置，`data/` 里的存档会丢（见「已知限制」）。
+前端改后端地址：改 `public/config.js` 里的 `window.D2D_API_BASE`（结尾不带斜杠），或在浏览器控制台 `localStorage.setItem('D2D_API_BASE', 'https://你的后端地址')` 后刷新。
 
-### 备选
+### 备选：整站一体部署（Render / Railway / Docker）
 
-Railway：New Project → Deploy from GitHub repo 选这个仓库，自动识别 Node 服务，Start Command 用 `npm start`；PORT 由平台注入。
+不想分开部署时，这个仓库也能当单体跑：`npm install && npm start` 起 Express 服务，同时提供页面与接口（同域，`config.js` 为空即可）。
 
-Docker 自建：仓库带 Dockerfile（node:22-alpine，`npm install --omit=dev && npm start`，端口读 PORT）。
+- Render：README 顶部有 Deploy to Render 按钮（render.yaml 已配好构建命令 `npm install`、启动命令 `npm start`、健康检查 `/api/health`）。免费实例限制：15 分钟无人访问会休眠，首次访问要等几秒；实例磁盘随重启/重新部署重置，`data/` 里的存档会丢（见「已知限制」）。
+- Railway：New Project → Deploy from GitHub repo 选这个仓库，自动识别 Node 服务，Start Command 用 `npm start`；PORT 由平台注入。
+- Docker 自建：仓库带 Dockerfile（node:22-alpine，`npm install --omit=dev && npm start`，端口读 PORT）。
 
 ```bash
 docker build -t deepseek-to-doc .
@@ -226,35 +227,47 @@ docker run -d --name deepseek-to-doc -e PORT=8080 -p 8080:8080 --restart unless-
 
 ```
 deepseek-to-doc/
-├── .gitignore            # 忽略 node_modules / 日志 / .env / data
-├── render.yaml           # Render Blueprint（一键部署）
-├── data/                 # 运行时生成的公开分享内容（不进 git；界面存档在浏览器 IndexedDB）
-├── src/
-│   ├── convert.js        # 识别转换入口（三平台分发 + 粘贴）
-│   ├── archive.js        # data/ 目录持久化存档
-├── .dockerignore           # Docker 构建时排除的内容
-├── Dockerfile              # node:22-alpine，VPS / Zeabur 用
-├── LICENSE                # MIT
-├── server.js              # Express 服务：代理抓取、生成、预览、下载
-├── src/
-│   ├── shareUrl.js        # 链接 → share id（只认 DeepSeek）
-│   ├── fetchShare.js      # 调分享接口（带超时、错误码映射）
-│   ├── parseShare.js      # 接口 JSON → 统一对话模型（parent_id 链排序）
-│   ├── htmlFallback.js    # 分享页 HTML 兜底解析
-│   ├── paste.js           # 粘贴全文解析
-│   ├── convert.js         # 生成选项套用 + 转换编排
-│   ├── groupByDate.js     # 按日期分组
-│   ├── renderHtml.js      # HTML 文档
-│   ├── renderMarkdown.js  # Markdown 文档
+├── index.html            # GitHub Pages 入口（加载 public/ 里的页面文件）
+├── .nojekyll             # 告诉 Pages 不要走 Jekyll
+├── .gitignore            # 忽略 node_modules / 日志 / .env / data / Worker 打包产物
+├── render.yaml           # Render Blueprint（一键部署单体）
+├── data/                 # 本地/单体运行时生成的公开分享内容（不进 git；界面存档在浏览器 IndexedDB）
+├── server.js             # Express 服务：代理抓取、生成、预览、下载（本地与单体部署用）
+├── src/                  # 转换核心（Express 与 Worker 共用）
+│   ├── shareUrl.js       # 链接 → share id（只认 DeepSeek）
+│   ├── fetchShare.js     # 调分享接口（带超时、错误码映射）
+│   ├── parseShare.js     # 接口 JSON → 统一对话模型（parent_id 链排序）
+│   ├── htmlFallback.js   # 分享页 HTML 兜底解析
+│   ├── paste.js          # 粘贴全文解析
+│   ├── convert.js        # 生成选项套用 + 转换编排
+│   ├── groupByDate.js    # 按日期分组
+│   ├── renderHtml.js     # HTML 文档
+│   ├── renderMarkdown.js # Markdown 文档
 │   ├── renderTranscript.js # AI 对话稿（给其他 AI 应用粘贴用）
-│   ├── markdown.js        # marked 封装（转义、标题降级、代码块标签）
-│   ├── localtime.js       # 时区换算
-│   └── filenames.js       # 文件名清洗
-├── public/                # 页面（原生 HTML/CSS/JS，无构建）
-├── samples/               # 实测样本
-└── test/                  # node:test 用例
+│   ├── markdown.js       # marked 封装（转义、标题降级、代码块标签）
+│   ├── localtime.js      # 时区换算
+│   ├── filenames.js      # 文件名清洗
+│   ├── archive.js        # data/ 目录持久化存档（Express 版）
+│   └── revocation.js     # 撤销令牌（Node 版；Worker 版在 backend/revocation.js）
+├── backend/              # Cloudflare Worker 后端
+│   ├── worker.js         # Worker 入口（转换、分享、撤销；管理接口未启用）
+│   ├── kv-archive.js     # KV 持久化存档（接口与 src/archive.js 对齐）
+│   └── revocation.js     # 撤销令牌（Web Crypto 版，与 Node 版同格式）
+├── public/               # 页面（原生 HTML/CSS/JS，无构建）
+│   ├── index.html        # 页面（本地/单体部署的入口；Pages 入口在仓库根）
+│   ├── config.js         # 后端地址（window.D2D_API_BASE）
+│   ├── app.js            # 前端逻辑（API_BASE + 撤销流程）
+│   ├── style.css         # 样式（含移动端适配）
+│   ├── localdate.js      # 本地日期工具
+│   ├── retitle.js        # 标题重命名
+│   └── batchExport.js    # 多选合订导出
+├── samples/              # 实测样本
+├── test/                 # node:test 用例
+├── Dockerfile            # node:22-alpine，VPS / Zeabur 用
+├── .dockerignore         # Docker 构建时排除的内容
+└── LICENSE               # MIT
 ```
 
 ## 隐私
 
-转换后的完整文档会发送到本应用服务端，并保存在 `data/` 目录供公开分享链接读取；浏览器另外保存一份 IndexedDB 副本。分享链接默认公开，任何拿到链接的人都可读取。新记录可在创建它的浏览器中撤销分享并删除服务端副本；不要导入含敏感信息的对话，除非你接受服务端存储与公开链接的风险。
+转换后的完整文档会发送到本应用服务端，并保存在服务端供公开分享链接读取（线上是 Cloudflare KV，本地/单体部署是 `data/` 目录）；浏览器另外保存一份 IndexedDB 副本。分享链接默认公开，任何拿到链接的人都可读取。新记录可在创建它的浏览器中撤销分享并删除服务端副本；不要导入含敏感信息的对话，除非你接受服务端存储与公开链接的风险。

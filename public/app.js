@@ -1,6 +1,14 @@
-import { localDateString } from '/localdate.js';
-import { applyTitle, applyDocStyle } from '/retitle.js';
-import { mergedHtml, mergedMarkdown } from '/batchExport.js';
+import { localDateString } from './localdate.js';
+import { applyTitle, applyDocStyle } from './retitle.js';
+import { mergedHtml, mergedMarkdown } from './batchExport.js';
+
+// 后端地址：config.js 里配置（window.D2D_API_BASE），可用浏览器 localStorage 的 D2D_API_BASE 覆盖。
+// 前后端同域部署（后端托管本目录）时为空串，请求打相对路径即可。
+const API_BASE = String(
+  (typeof localStorage !== 'undefined' && localStorage.getItem('D2D_API_BASE')) ||
+  (typeof window !== 'undefined' && window.D2D_API_BASE) ||
+  '',
+).replace(/\/+$/, '');
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -155,7 +163,7 @@ function downloadBlob(name, content, mime) {
 }
 
 function shareLinkOf(entry) {
-  return entry.shareUrl || `${location.origin}/share/${entry.id}`;
+  return entry.shareUrl || `${API_BASE || location.origin}/share/${entry.id}`;
 }
 
 function openResult(data) {
@@ -206,7 +214,7 @@ async function convert(path, body, btn) {
   btn.disabled = true;
   setStatus('loading', '正在识别并生成文档，长对话可能要几秒…');
   try {
-    const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
       setStatus('error', `${data.message || `请求失败（HTTP ${res.status}）`}\n抓不到链接时，展开「粘贴全文」把内容贴进来，同样能生成文档。`);
@@ -218,7 +226,7 @@ async function convert(path, body, btn) {
     toast('已生成：本机保存一份，公开分享副本在服务端');
     refreshArchive();
   } catch (err) {
-    setStatus('error', `网络错误：${err.message}。请确认服务可访问。`);
+    setStatus('error', `网络错误：${err.message}。请确认后端服务可访问（前后端分开部署时，检查 config.js 里的后端地址与后端 CORS_ORIGINS 配置）。`);
   } finally {
     btn.classList.remove('is-loading');
     btn.disabled = false;

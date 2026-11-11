@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 对话识别存档 · DeepSeek</title>
+<link rel="stylesheet" href="public/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-inner">
+    <div class="brand"><span class="brand-dot"></span>对话识别存档</div>
+    <nav class="nav">
+      <button class="nav-btn active" data-view="home" type="button">识别</button>
+      <button class="nav-btn" data-view="archive" type="button">存档<span id="archive-count" class="count hidden">0</span></button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="view-home" class="view home-view">
+    <div class="hero-card">
+      <h1>AI 对话，直接变文档</h1>
+      <p class="sub">粘贴 DeepSeek 的分享链接，点「识别存档」，生成按日期排版的 HTML 与 Markdown 文档。本机文档副本保存在浏览器（IndexedDB）；为提供公开分享链接，生成的完整内容也会发送并保存在本站服务端。可勾选删掉思考过程等内容；删除新存档时会同时关闭对应分享链接。</p>
+      <div class="input-row">
+        <input id="url" type="text" placeholder="https://chat.deepseek.com/share/…" autocomplete="off" spellcheck="false">
+        <button id="go" class="btn primary" type="button">识别存档</button>
+      </div>
+      <div class="gen-opts" id="gen-opts">
+        <span class="gen-opts-title">生成选项（对链接和粘贴都生效）：</span>
+        <label class="opt-check"><input type="checkbox" id="opt-strip-thinking"> 只留正文（删思考过程等）</label>
+        <label class="opt-check"><input type="checkbox" id="opt-show-title" checked> 保存标题</label>
+        <label class="opt-check"><input type="checkbox" id="opt-show-link" checked> 保存原始链接</label>
+        <label class="opt-check"><input type="checkbox" id="opt-show-time" checked> 保存时间信息</label>
+        <span class="gen-opts-title">排版风格：</span>
+        <label class="opt-check"><input type="radio" name="docstyle" value="classic" checked> 经典文档</label>
+        <label class="opt-check"><input type="radio" name="docstyle" value="plain"> 简洁纯文本</label>
+        <label class="opt-check"><input type="radio" name="docstyle" value="bubbles"> 聊天气泡</label>
+      </div>
+      <div class="opts-row">
+        <label class="opt">时区 <select id="tz" class="tz"></select></label>
+        <button id="toggle-paste" class="link" type="button">没有链接？粘贴全文</button>
+      </div>
+      <div id="paste-box" class="paste-box hidden">
+        <textarea id="text" rows="8" placeholder="把对话全文贴进来，会照样生成文档并进入存档。"></textarea>
+        <div class="paste-meta">
+          <input id="paste-title" type="text" placeholder="标题（可选）">
+          <input id="paste-date" type="date">
+          <select id="tz-paste" class="tz"></select>
+          <button id="go-paste" class="btn primary" type="button">识别存档</button>
+        </div>
+        <p class="paste-hint">认不出角色时整段成文；想分角色，在每段前加一行「用户：」「DeepSeek：」。</p>
+      </div>
+      <div id="status" class="status hidden"></div>
+    </div>
+
+    <section id="recent" class="recent hidden">
+      <div class="section-head">
+        <h2>最近存档</h2>
+        <button class="link" data-view="archive" type="button">查看全部</button>
+      </div>
+      <div id="recent-list" class="cards"></div>
+    </section>
+  </section>
+
+  <section id="view-result" class="view hidden">
+    <div class="result-head">
+      <div class="result-title-wrap">
+        <button id="back" class="btn ghost" type="button">返回</button>
+        <h2 id="r-title"></h2>
+        <div id="r-meta" class="chips"></div>
+      </div>
+      <div class="style-row" id="style-row">
+        <span class="style-label">排版：</span>
+        <button data-style="classic" type="button">经典文档</button>
+        <button data-style="plain" type="button">简洁纯文本</button>
+        <button data-style="bubbles" type="button">聊天气泡</button>
+      </div>
+      <div class="result-actions">
+        <button id="toggle-md" class="btn" type="button">查看 Markdown</button>
+        <button id="dl-html" class="btn primary" type="button">下载 HTML</button>
+        <button id="dl-md" class="btn" type="button">下载 Markdown</button>
+        <button id="copy-transcript" class="btn" type="button">复制 AI 对话稿</button>
+        <button id="dl-transcript" class="btn" type="button">下载对话稿</button>
+      </div>
+    </div>
+    <div class="share-row" id="share-row">
+      <span class="share-label">分享链接（公开，可直接发给能读网页的 AI）：</span>
+      <a id="share-link" class="share-link" target="_blank" rel="noreferrer"></a>
+      <button id="copy-share" class="btn" type="button">复制链接</button>
+    </div>
+    <div class="result-body">
+      <iframe id="preview" title="文档预览"></iframe>
+      <pre id="md-view" class="md-view hidden"></pre>
+    </div>
+  </section>
+
+  <section id="view-archive" class="view hidden">
+    <div class="section-head">
+      <h2>存档</h2>
+      <span id="archive-count2" class="muted"></span>
+    </div>
+    <p class="muted" style="font-size:12px;margin:0 0 14px;">本机文档副本保存在 IndexedDB；公开分享内容另存于服务端。删除新存档会同时关闭分享链接；旧存档若没有撤销凭据，按钮会注明仅删本机副本。换设备或清除浏览器数据会丢本机副本和撤销凭据，重要内容请先下载。</p>
+    <div id="batch-bar" class="batch-bar hidden">
+      <label class="opt-check"><input type="checkbox" id="sel-all"> 全选</label>
+      <span id="sel-count" class="muted">未选择</span>
+      <span class="batch-actions">
+        <button id="exp-html" class="btn" type="button" disabled>导出合订 HTML</button>
+        <button id="exp-md" class="btn" type="button" disabled>导出合订 Markdown</button>
+      </span>
+    </div>
+    <div id="archive-list" class="cards"></div>
+    <p id="archive-empty" class="empty hidden">本机还没有存档。回到「识别」，粘一条分享链接试试。</p>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="public/config.js"></script>
+<script src="public/app.js" type="module"></script>
+</body>
+</html>

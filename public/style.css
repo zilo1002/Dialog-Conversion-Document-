@@ -198,7 +198,47 @@ body {
 .style-row [data-style].active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
 /* 多选与合订导出 */
-.batch-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
-.batch-bar .batch-actions { margin-left: auto; display: flex; gap: 8px; }
+.batch-bar { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.batch-bar .batch-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.batch-bar .btn { white-space: normal; max-width: 100%; }
 .batch-bar .btn:disabled { opacity: .45; cursor: not-allowed; }
 .card-sel { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); margin-right: 10px; white-space: nowrap; }
+
+/* —— 全设备适配 —— */
+.btn { max-width: 100%; }
+.result-actions .btn, .style-row [data-style] { white-space: normal; }
+.md-view { -webkit-overflow-scrolling: touch; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+
+@media (max-width: 640px) {
+  .bar-inner { padding: 10px 14px; }
+  .brand { font-size: 15px; }
+  .nav-btn { padding: 7px 11px; }
+  .view { padding: 16px 0 56px; }
+  .wrap { padding: 0 14px; }
+  .hero-card { padding: 24px 18px; }
+  .hero-card h1 { font-size: 22px; }
+  .hero-card .sub { font-size: 13.5px; }
+  .paste-meta input, .paste-meta select { flex: 1 1 150px; min-width: 0; }
+  /* 多选工具栏：勾选说明独占一行，两个导出按钮各占一半、文字回行，窄到极限再叠放 */
+  .batch-bar .batch-actions { width: 100%; margin-left: 0; }
+  .batch-bar .batch-actions .btn { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .card-actions .btn { padding: 8px 12px; font-size: 13px; }
+  .result-actions .btn { flex: 1 1 auto; }
+  .style-row [data-style] { padding: 6px 12px; }
+  #preview, .md-view { height: 58vh; }
+  .toast { width: max-content; max-width: calc(100vw - 32px); text-align: center; }
+}
+
+@media (max-width: 380px) {
+  .batch-bar .batch-actions .btn { flex: 1 1 100%; }
+  .hero-card h1 { font-size: 20px; }
+}
+
+/* 触屏设备：保证可点区域够大，输入字号 16px 防 iOS 聚焦缩放 */
+@media (pointer: coarse) {
+  .btn, .nav-btn, .style-row [data-style] { min-height: 40px; }
+  .btn.sm { min-height: 32px; }
+  input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; }
+  .input-row input, .paste-meta input, .rename-input { font-size: 16px; }
+}
