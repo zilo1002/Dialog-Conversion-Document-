@@ -304,7 +304,7 @@ function cardFor(item) {
     delBtn.disabled = true;
     if (item.revokeToken) {
       try {
-        const res = await fetch(`/api/share/${encodeURIComponent(item.id)}`, {
+        const res = await fetch(`${API_BASE}/api/share/${encodeURIComponent(item.id)}`, {
           method: 'DELETE',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ token: item.revokeToken }),
